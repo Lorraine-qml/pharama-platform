@@ -563,8 +563,8 @@ function AppShellInner() {
             </div>
           </header>
 
-          <main className="flex-1 px-6 py-6 sm:px-8 sm:py-8">
-            <div className="mb-6">
+          <main className="flex-1 px-6 py-5 sm:px-8 sm:py-6">
+            <div className="mb-4">
               <nav aria-label="面包屑" className="flex flex-wrap items-center gap-1 text-[13px] text-muted">
                 {meta.breadcrumbs.map((crumb, i) => {
                   const last = i === meta.breadcrumbs.length - 1
@@ -582,12 +582,8 @@ function AppShellInner() {
                   )
                 })}
               </nav>
-              <h1 className="mt-3 text-[22px] font-semibold tracking-tight text-foreground">{meta.title}</h1>
+              <h1 className="mt-2 text-[22px] font-semibold tracking-tight text-foreground">{meta.title}</h1>
             </div>
-            <p className="mb-6 rounded-lg border border-primary/20 bg-primary-light/55 px-3 py-2 text-[12px] leading-relaxed text-foreground">
-              <span className="font-semibold text-primary">演示说明：</span>
-              登录后侧边栏展示全量功能入口，不按角色隐藏；菜单括号内标注生产环境中常见职责划分。各页操作区可能合并多角色视角，实际权限以部署时 RBAC 为准。
-            </p>
             <Outlet />
           </main>
         </div>

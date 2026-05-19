@@ -275,10 +275,6 @@ export default function InnovationProjectDetailPage() {
 
   return (
     <div className="space-y-5">
-      <p className="rounded-md border border-primary/25 bg-primary-light/50 px-3 py-2 text-[12px] leading-relaxed text-foreground">
-        <span className="font-semibold text-primary">演示说明：</span>
-        本页同时展示原「园区运营 / 申报企业 / 专家」视角下可见的操作；生产环境将按角色与数据权限收敛。
-      </p>
       <nav className="flex flex-wrap items-center gap-1 text-[12px] text-muted">
         <Link to="/innovation" className="hover:text-primary">
           科创策源
