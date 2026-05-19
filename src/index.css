@@ -1,0 +1,110 @@
+@import 'tailwindcss';
+
+@theme inline {
+  /* PRD 第2章 核心色板 */
+  --color-primary: #1e6dff;
+  --color-primary-hover: #0055e0;
+  --color-primary-light: #ecf3ff;
+  --color-page: #f5f7fa;
+  --color-surface: #ffffff;
+  --color-foreground: #1f2a3e;
+  --color-muted: #6b7280;
+  /* Arco 风格侧栏（一级灰字 / 二级选中底） */
+  --color-nav-item: #4e5969;
+  --color-nav-sub-active-bg: #f2f3f5;
+  --color-divider: #e5e9f0;
+  --color-success: #00c9a7;
+  --color-warning: #ff8a34;
+  --color-danger: #f44336;
+  --radius-button: 8px;
+  --radius-card: 8px;
+  --radius-panel: 16px;
+  --shadow-card: 0 1px 3px rgb(31 42 62 / 0.08), 0 1px 2px rgb(31 42 62 / 0.06);
+  --font-sans: ui-sans-serif, system-ui, 'Inter', 'Roboto', 'PingFang SC',
+    'Microsoft YaHei', sans-serif;
+}
+
+@layer base {
+  :root {
+    --primary: #1e6dff;
+    --primary-hover: #0055e0;
+    --primary-light: #ecf3ff;
+    --bg-gray: #f5f7fa;
+    --white: #ffffff;
+    --text-primary: #1f2a3e;
+    --text-secondary: #6b7280;
+    --border-light: #e5e9f0;
+    --success: #00c9a7;
+    --warning: #ff8a34;
+    --error: #f44336;
+  }
+
+  html {
+    font-family: var(--font-sans);
+    font-size: 14px;
+    line-height: 1.5;
+    color: var(--color-foreground);
+    background: var(--color-page);
+    -webkit-font-smoothing: antialiased;
+  }
+
+  *,
+  *::before,
+  *::after {
+    border-color: var(--color-divider);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    color: var(--color-foreground);
+    background-color: var(--color-page);
+  }
+
+  button {
+    cursor: pointer;
+    font-family: inherit;
+  }
+
+  input,
+  textarea,
+  select {
+    font-family: inherit;
+  }
+}
+
+#root {
+  min-height: 100vh;
+}
+
+@keyframes sj-progress-in {
+  from {
+    opacity: 0;
+    transform: translateX(-10px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+@keyframes sj-pulse-soft {
+  0%,
+  100% {
+    opacity: 0.28;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.55;
+    transform: scale(1.06);
+  }
+}
+
+@keyframes sj-panel-fade {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}

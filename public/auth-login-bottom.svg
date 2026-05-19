@@ -1,0 +1,23 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1920" height="280" viewBox="0 0 1920 280" preserveAspectRatio="none" fill="none">
+  <defs>
+    <linearGradient id="b1" x1="0" y1="0" x2="1920" y2="0" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#1E6DFF" stop-opacity="0.14"/>
+      <stop offset="0.35" stop-color="#E8F1FF" stop-opacity="0.95"/>
+      <stop offset="0.65" stop-color="#F5F9FF"/>
+      <stop offset="1" stop-color="#1E6DFF" stop-opacity="0.1"/>
+    </linearGradient>
+    <linearGradient id="b2" x1="960" y1="40" x2="960" y2="280" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#F5F7FA" stop-opacity="0"/>
+      <stop offset="1" stop-color="#E8F0FF" stop-opacity="0.65"/>
+    </linearGradient>
+  </defs>
+  <rect width="1920" height="280" fill="url(#b1)"/>
+  <path d="M0 120 C320 60 560 200 960 96 C1340 0 1580 180 1920 72 V280 H0 Z" fill="url(#b2)" opacity="0.9"/>
+  <path d="M0 168 Q480 96 960 152 T1920 136 V280 H0 Z" fill="#1E6DFF" fill-opacity="0.06"/>
+  <path d="M0 200 Q640 260 960 184 T1920 208 V280 H0 Z" fill="#FFFFFF" fill-opacity="0.55"/>
+  <g opacity="0.2" stroke="#1E6DFF" stroke-width="1">
+    <path d="M0 210 H1920"/>
+    <path d="M0 232 H1920"/>
+    <path d="M0 254 H1920"/>
+  </g>
+</svg>
