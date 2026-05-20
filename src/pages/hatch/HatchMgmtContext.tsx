@@ -9,10 +9,12 @@ import {
 import { useToast } from '../../components/ToastProvider'
 import type {
   ChangeRequest,
+  ContractRemindLog,
   FlowNodeKey,
   HatchIncubationType,
   PipelineItem,
   ProjectArchive,
+  SigningConfirmPayload,
   SigningContract,
   SpaceAllocation,
   SpaceUsageLog,
@@ -82,6 +84,19 @@ type Ctx = {
   createArchiveFromIncubationRegister: (p: CreateIncubationArchivePayload) => string
   /** 策源决策通过等场景：追加一条「待签署」签约记录（演示） */
   appendSigningContract: (row: Omit<SigningContract, 'id'>) => { ok: true; contractId: string } | { ok: false; reason: 'duplicate' | 'bad_payload' }
+  /** 工作台：确认签署 / 续约（有扫描件则生效） */
+  confirmWorkbenchSigning: (
+    contractId: string | null,
+    payload: SigningConfirmPayload,
+    hasScan: boolean,
+    workbenchTaskId?: string,
+  ) => string
+  /** 工作台：发起续约，原合同终止并生成新待签署记录 */
+  startRenewalWorkbench: (oldContractId: string, payload: SigningConfirmPayload, hasScan: boolean) => string
+  sendExpireContractReminder: (contractId: string, methods: { site: boolean; email: boolean }) => void
+  markExpireReminderHandled: (contractId: string) => void
+  dismissedWorkbenchTaskIds: string[]
+  dismissWorkbenchTask: (taskId: string) => void
 }
 
 const HatchCtx = createContext<Ctx | null>(null)
@@ -93,6 +108,29 @@ export function HatchMgmtProvider({ children }: { children: ReactNode }) {
   const [allocations, setAllocations] = useState<SpaceAllocation[]>(() => [...INITIAL_SPACES])
   const [spaceLogs, setSpaceLogs] = useState<Record<string, SpaceUsageLog[]>>(() => ({ ...INITIAL_SPACE_LOGS }))
   const [changes, setChanges] = useState<ChangeRequest[]>(() => [...INITIAL_CHANGES])
+  const [dismissedWorkbenchTaskIds, setDismissedWorkbenchTaskIds] = useState<string[]>([])
+
+  const dismissWorkbenchTask = useCallback((taskId: string) => {
+    setDismissedWorkbenchTaskIds((prev) => (prev.includes(taskId) ? prev : [...prev, taskId]))
+  }, [])
+
+  const applySigningPayload = (base: SigningContract, payload: SigningConfirmPayload, tplName?: string): SigningContract => ({
+    ...base,
+    incubationType: payload.incubationType,
+    templateId: payload.templateId,
+    templateName: tplName,
+    termStart: payload.termStart,
+    termEnd: payload.termEnd,
+    rentYuanPerMonth: payload.rentYuanPerMonth,
+    propertyFee: payload.propertyFee,
+    techFeeYuanPerMonth: payload.techFeeYuanPerMonth,
+    aiPackage: payload.aiPackage,
+    scanFileName: payload.scanFileName ?? payload.contractAttachments?.[0],
+    contractAttachments: payload.contractAttachments,
+    contractRemark: payload.contractRemark,
+    contractEnd: payload.termEnd,
+    createdAt: base.createdAt ?? new Date().toISOString().slice(0, 10),
+  })
 
   const signContract = useCallback((contractId: string, scanFileName: string) => {
     let snap: SigningContract | undefined
@@ -144,6 +182,136 @@ export function HatchMgmtProvider({ children }: { children: ReactNode }) {
   const sendReminder = useCallback((contractId: string, kind: '催签' | '续约', projectName: string) => {
     void contractId
     notifyDemo(toast, `${kind}通知已发送至「${projectName}」`)
+  }, [toast])
+
+  const confirmWorkbenchSigning = useCallback(
+    (contractId: string | null, payload: SigningConfirmPayload, hasScan: boolean, workbenchTaskId?: string) => {
+      let resultId = contractId ?? ''
+      if (contractId) {
+        setContracts((prev) =>
+          prev.map((c) => {
+            if (c.id !== contractId) return c
+            const next = applySigningPayload(c, payload)
+            resultId = c.id
+            if (hasScan) {
+              return {
+                ...next,
+                signStatus: '已生效',
+                scanFileName: payload.scanFileName,
+                crmContractId: c.crmContractId ?? `crm-${Date.now().toString(36)}`,
+              }
+            }
+            return { ...next, signStatus: '待签署' }
+          }),
+        )
+        if (hasScan) {
+          signContract(contractId, payload.scanFileName ?? 'signed.pdf')
+        } else {
+          toast.show('已创建签约记录（待签署）。请线下签署后上传扫描件。', 'warning')
+        }
+      } else {
+        const id = `c-wb-${Date.now().toString(36)}`
+        resultId = id
+        const row: SigningContract = {
+          id,
+          projectId: payload.projectId,
+          projectName: payload.projectName,
+          incubationType: payload.incubationType,
+          signStatus: hasScan ? '已生效' : '待签署',
+          contractEnd: hasScan ? payload.termEnd : null,
+          rentYuanPerMonth: payload.rentYuanPerMonth,
+          propertyFee: payload.propertyFee,
+          techFeeYuanPerMonth: payload.techFeeYuanPerMonth,
+          aiPackage: payload.aiPackage,
+          templateId: payload.templateId,
+          termStart: payload.termStart,
+          termEnd: payload.termEnd,
+          scanFileName: payload.scanFileName,
+          createdAt: new Date().toISOString().slice(0, 10),
+        }
+        setContracts((prev) => [row, ...prev])
+        if (hasScan) {
+          signContract(id, payload.scanFileName ?? 'signed.pdf')
+        } else {
+          toast.show('已创建签约记录（待签署）。请线下签署后上传扫描件。', 'warning')
+          notifyDemo(toast, 'CRM 合同草稿已同步（演示）')
+        }
+      }
+      if (workbenchTaskId) dismissWorkbenchTask(workbenchTaskId)
+      if (hasScan && contractId) {
+        toast.show('合同已生效，工作台任务已办结', 'success')
+        notifyDemo(toast, 'CRM 合同已确认生效（演示）')
+      }
+      return resultId
+    },
+    [dismissWorkbenchTask, signContract, toast],
+  )
+
+  const startRenewalWorkbench = useCallback(
+    (oldContractId: string, payload: SigningConfirmPayload, hasScan: boolean) => {
+      const old = contracts.find((c) => c.id === oldContractId)
+      if (!old) return ''
+      setContracts((prev) =>
+        prev.map((c) => (c.id === oldContractId ? { ...c, signStatus: '已终止' as const } : c)),
+      )
+      const id = `c-renew-${Date.now().toString(36)}`
+      const row: SigningContract = {
+        id,
+        projectId: payload.projectId,
+        projectName: payload.projectName,
+        incubationType: payload.incubationType,
+        signStatus: hasScan ? '已生效' : '待签署',
+        contractEnd: payload.termEnd,
+        rentYuanPerMonth: payload.rentYuanPerMonth,
+        propertyFee: payload.propertyFee,
+        techFeeYuanPerMonth: payload.techFeeYuanPerMonth,
+        aiPackage: payload.aiPackage,
+        templateId: payload.templateId,
+        termStart: payload.termStart,
+        termEnd: payload.termEnd,
+        scanFileName: payload.scanFileName,
+        createdAt: new Date().toISOString().slice(0, 10),
+      }
+      setContracts((prev) => [row, ...prev])
+      if (hasScan) {
+        signContract(id, payload.scanFileName ?? 'renew_signed.pdf')
+        toast.show('续约协议已生效', 'success')
+      } else {
+        toast.show('续约记录已生成（待签署），请完成线下签署', 'info')
+      }
+      notifyDemo(toast, '原合同已终止，新续约记录已创建（演示）')
+      return id
+    },
+    [contracts, signContract, toast],
+  )
+
+  const sendExpireContractReminder = useCallback(
+    (contractId: string, methods: { site: boolean; email: boolean }) => {
+      const method = [methods.site && '站内信', methods.email && '邮件'].filter(Boolean).join('+') || '站内信'
+      const log: ContractRemindLog = {
+        id: `rl-${Date.now()}`,
+        contractId,
+        remindDay: -1,
+        remindTime: new Date().toISOString().slice(0, 16).replace('T', ' '),
+        method,
+        status: '成功',
+      }
+      setContracts((prev) =>
+        prev.map((c) =>
+          c.id === contractId ? { ...c, remindLogs: [...(c.remindLogs ?? []), log] } : c,
+        ),
+      )
+      const c = contracts.find((x) => x.id === contractId)
+      notifyDemo(toast, `合同到期提醒已发送至「${c?.projectName ?? contractId}」`)
+    },
+    [contracts, toast],
+  )
+
+  const markExpireReminderHandled = useCallback((contractId: string) => {
+    setContracts((prev) =>
+      prev.map((c) => (c.id === contractId ? { ...c, expireRemindHandled: true } : c)),
+    )
+    toast.show('已标记为已处理', 'success')
   }, [toast])
 
   const updateArchive = useCallback((id: string, patch: Partial<ProjectArchive>, note?: string) => {
@@ -490,6 +658,12 @@ export function HatchMgmtProvider({ children }: { children: ReactNode }) {
       completeExit,
       createArchiveFromIncubationRegister,
       appendSigningContract,
+      confirmWorkbenchSigning,
+      startRenewalWorkbench,
+      sendExpireContractReminder,
+      markExpireReminderHandled,
+      dismissedWorkbenchTaskIds,
+      dismissWorkbenchTask,
     }),
     [
       contracts,
@@ -523,6 +697,12 @@ export function HatchMgmtProvider({ children }: { children: ReactNode }) {
       completeExit,
       createArchiveFromIncubationRegister,
       appendSigningContract,
+      confirmWorkbenchSigning,
+      startRenewalWorkbench,
+      sendExpireContractReminder,
+      markExpireReminderHandled,
+      dismissedWorkbenchTaskIds,
+      dismissWorkbenchTask,
     ],
   )
 

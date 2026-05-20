@@ -43,11 +43,10 @@ export default function HatchArchivePage() {
   return (
     <div className="space-y-5 pb-10">
       <ModuleIntroCard
-        title="📌 入孵项目档案 · 项目主数据中心"
+        title="📌 入孵项目档案 · 项目全息数据中心"
         lines={[
-          '与科创策源资料合并（演示），结构化同步；支持查看、编辑与导入导出。',
-          '核心流程：决策通过 → 签约 → 档案初始化 → 空间分配（实体） → 正常运营 → 变更 / 毕业。',
-          '状态说明：待签约需签署协议；档案初始化需补充管线、团队、融资等信息；正常运营可申请资源与使用 AI 服务。',
+          '集中展示从注册、评估、签约、入驻到毕业退出的完整信息；运营可查看、编辑与补充资料。',
+          '任务处理请前往「入孵运营工作台」；本页仅作档案查询与维护。',
         ]}
       />
 
@@ -109,6 +108,7 @@ export default function HatchArchivePage() {
                 <th className="px-4 py-3">主体类型</th>
                 <th className="px-4 py-3">入孵类型</th>
                 <th className="px-4 py-3">状态</th>
+                <th className="px-4 py-3">合同到期日</th>
                 <th className="px-4 py-3">标签</th>
                 <th className="px-4 py-3 text-end">操作</th>
               </tr>
@@ -122,6 +122,7 @@ export default function HatchArchivePage() {
                   <td className="px-4 py-3">
                     <StatusPill variant={hatchArchivePillVariant(a.status)}>{a.status}</StatusPill>
                   </td>
+                  <td className="px-4 py-3 text-muted">{a.contractEnd ?? '—'}</td>
                   <td className="max-w-[220px] px-4 py-3 text-[12px] text-muted">{a.tags.join('，')}</td>
                   <td className="px-4 py-3 text-end">
                     <Link to={`/hatch/archive/${a.id}`} className="font-semibold text-primary hover:underline">

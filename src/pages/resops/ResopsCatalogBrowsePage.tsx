@@ -6,16 +6,19 @@ import { ModuleIntroCard } from '../../components/moduleIntro/ModuleIntroCard'
 import { cn } from '../../utils/cn'
 import { useResopsV1 } from './ResopsV1Context'
 import { feeSummary } from './resopsV1Labels'
+import type { ResResource } from './resopsV1Types'
+import { canBookResResource, ResourceBookingModal } from './ResourceBookingModal'
 
 const TYPE_CHIPS = ['全部', '空间', '设备', '专家', '技术服务', 'AI能力'] as const
 
 export default function ResopsCatalogBrowsePage() {
   const toast = useToast()
   const { resources } = useResopsV1()
-  const [searchParams] = useSearchParams()
+  const [searchParams, setSearchParams] = useSearchParams()
   const [chip, setChip] = useState<string>('全部')
   const [q, setQ] = useState('')
   const [sort, setSort] = useState<'default' | 'priceAsc' | 'rating'>('default')
+  const [bookingResource, setBookingResource] = useState<ResResource | null>(null)
 
   const listed = useMemo(() => resources.filter((r) => r.status === 'listed'), [resources])
 
@@ -23,8 +26,13 @@ export default function ResopsCatalogBrowsePage() {
     const applyRes = searchParams.get('applyRes')
     if (!applyRes) return
     const r = resources.find((x) => x.id === applyRes)
-    toast.show(`已从孪生空间带入预约资源：${r?.name ?? applyRes}（演示）`, 'info')
-  }, [searchParams, resources, toast])
+    if (r && r.status === 'listed') {
+      setBookingResource(r)
+    }
+    const next = new URLSearchParams(searchParams)
+    next.delete('applyRes')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, resources, setSearchParams])
 
   const filtered = useMemo(() => {
     let xs = listed.filter((r) => {
@@ -42,11 +50,19 @@ export default function ResopsCatalogBrowsePage() {
     return xs
   }, [listed, q, chip, sort])
 
+  function openBooking(r: ResResource) {
+    if (!canBookResResource(r)) {
+      toast.show('当前资源不可预约（仅空闲或可预约状态可发起）', 'info')
+      return
+    }
+    setBookingResource(r)
+  }
+
   return (
     <div className="space-y-5">
       <ModuleIntroCard
         title="📌 资源目录 · 已上架资源检索与申请"
-        lines={['已上架资源超市：检索、筛选、查看详情并发起申请（演示）。', '核心流程：浏览目录 → 查看详情 → 发起预约 → 生成申请 / 使用单。']}
+        lines={['已上架资源超市：检索、筛选、查看详情并发起预约（演示）。', '核心流程：浏览目录 → 点击预约填写信息 → 生成申请 / 使用单。']}
       />
 
       <ListToolbarRow
@@ -92,29 +108,49 @@ export default function ResopsCatalogBrowsePage() {
       </div>
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-        {filtered.map((r) => (
-          <article key={r.id} className="flex flex-col rounded-[var(--radius-panel)] border border-divider bg-surface p-4 shadow-sm">
-            <h2 className="text-[16px] font-bold text-foreground">{r.name}</h2>
-            <p className="mt-1 text-[12px] text-muted">
-              {r.level2} · {r.level1}
-            </p>
-            <p className="mt-2 text-[13px] text-foreground">
-              ⭐{r.rating.toFixed(1)} <span className="text-muted">（{r.reviewCount} 评价）</span>
-            </p>
-            <p className="mt-2 text-[15px] font-bold text-primary">{feeSummary(r.feeMode, r.priceAmount, r.priceUnit, r.remark)}</p>
-            <p className="mt-1 text-[12px] font-medium text-muted">{r.availabilityLabel}</p>
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Link to={`/resops/resource/${r.id}`} className="rounded-md bg-primary px-3 py-2 text-[12px] font-bold text-white hover:bg-primary-hover">
-                预约
-              </Link>
-              <Link to={`/resops/resource/${r.id}`} className="rounded-md border border-divider px-3 py-2 text-[12px] font-semibold hover:border-primary">
-                详情
-              </Link>
-            </div>
-          </article>
-        ))}
+        {filtered.map((r) => {
+          const bookable = canBookResResource(r)
+          return (
+            <article key={r.id} className="flex flex-col rounded-[var(--radius-panel)] border border-divider bg-surface p-4 shadow-sm">
+              <h2 className="text-[16px] font-bold text-foreground">{r.name}</h2>
+              <p className="mt-1 text-[12px] text-muted">
+                {r.level2} · {r.level1}
+              </p>
+              <p className="mt-2 text-[13px] text-foreground">
+                ⭐{r.rating.toFixed(1)} <span className="text-muted">（{r.reviewCount} 评价）</span>
+              </p>
+              <p className="mt-2 text-[15px] font-bold text-primary">{feeSummary(r.feeMode, r.priceAmount, r.priceUnit, r.remark)}</p>
+              <p className="mt-1 text-[12px] font-medium text-muted">{r.availabilityLabel}</p>
+              <div className="mt-4 flex flex-wrap gap-2">
+                {bookable ? (
+                  <button
+                    type="button"
+                    className="rounded-md bg-primary px-3 py-2 text-[12px] font-bold text-white hover:bg-primary-hover"
+                    onClick={() => openBooking(r)}
+                  >
+                    预约
+                  </button>
+                ) : (
+                  <button
+                    type="button"
+                    disabled
+                    className="cursor-not-allowed rounded-md border border-divider bg-muted/50 px-3 py-2 text-[12px] font-bold text-muted"
+                    title="当前状态不可预约"
+                  >
+                    预约
+                  </button>
+                )}
+                <Link to={`/resops/resource/${r.id}`} className="rounded-md border border-divider px-3 py-2 text-[12px] font-semibold hover:border-primary">
+                  详情
+                </Link>
+              </div>
+            </article>
+          )
+        })}
       </div>
       {filtered.length === 0 ? <p className="text-center text-[13px] text-muted">暂无匹配资源。</p> : null}
+
+      <ResourceBookingModal resource={bookingResource} open={bookingResource != null} onClose={() => setBookingResource(null)} />
     </div>
   )
 }

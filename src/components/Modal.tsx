@@ -1,4 +1,5 @@
 import type { ReactNode } from 'react'
+import { useEffect } from 'react'
 import { cn } from '../utils/cn'
 
 type Props = {
@@ -16,10 +17,33 @@ type Props = {
   fillHeight?: boolean
   /** 点击遮罩是否关闭；重要表单建议 false */
   closeOnOverlayClick?: boolean
+  /** 隐藏关闭按钮并禁用 Esc（评估中等场景） */
+  disableClose?: boolean
 }
 
-export function Modal({ open, title, onClose, children, footer, panelClassName, fillHeight, closeOnOverlayClick = true }: Props) {
+export function Modal({
+  open,
+  title,
+  onClose,
+  children,
+  footer,
+  panelClassName,
+  fillHeight,
+  closeOnOverlayClick = true,
+  disableClose = false,
+}: Props) {
+  useEffect(() => {
+    if (!open || disableClose) return
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') onClose()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [open, disableClose, onClose])
+
   if (!open) return null
+
+  const canClose = !disableClose
 
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center p-2 sm:p-4">
@@ -27,7 +51,7 @@ export function Modal({ open, title, onClose, children, footer, panelClassName, 
         role="presentation"
         className="absolute inset-0 bg-foreground/40"
         aria-hidden
-        onClick={closeOnOverlayClick ? onClose : undefined}
+        onClick={canClose && closeOnOverlayClick ? onClose : undefined}
       />
       <div
         role="dialog"
@@ -40,13 +64,13 @@ export function Modal({ open, title, onClose, children, footer, panelClassName, 
       >
         <div className="mb-3 flex shrink-0 items-start justify-between gap-4 sm:mb-4">
           <h2 className="text-[17px] font-semibold leading-snug text-foreground sm:text-[18px]">{title}</h2>
-          <button
-            type="button"
-            className="shrink-0 text-muted hover:text-foreground"
-            onClick={onClose}
-          >
-            ✕
-          </button>
+          {canClose ? (
+            <button type="button" className="shrink-0 text-muted hover:text-foreground" onClick={onClose}>
+              ✕
+            </button>
+          ) : (
+            <span className="w-6" aria-hidden />
+          )}
         </div>
         <div className={cn(fillHeight && 'flex min-h-0 min-w-0 flex-1 flex-col overflow-hidden')}>{children}</div>
         {footer ? (

@@ -34,30 +34,25 @@ import BasicResourceTypesPage from './pages/basicData/BasicResourceTypesPage'
 import InnovationSciShell from './pages/innovation/InnovationSciShell'
 import InnovationIndexRedirect from './pages/innovation/InnovationIndexRedirect'
 import { InnovationLegacyRoutes } from './pages/innovation/InnovationLegacyRedirects'
-import InnovationApplicantProjectsPage from './pages/innovation/InnovationApplicantProjectsPage'
 import IncubationProjectRegisterWizardPage from './pages/innovation/IncubationProjectRegisterWizardPage'
 import InnovationProjectDetailPage from './pages/innovation/InnovationProjectDetailPage'
 import InnovationOpsWorkbenchPage from './pages/innovation/InnovationOpsWorkbenchPage'
 import InnovationOpsPoolPage from './pages/innovation/InnovationOpsPoolPage'
 import InnovationOpsAiHubPage from './pages/innovation/InnovationOpsAiHubPage'
-import InnovationOpsExpertMgmtPage from './pages/innovation/InnovationOpsExpertMgmtPage'
-import InnovationOpsDecisionHubPage from './pages/innovation/InnovationOpsDecisionHubPage'
 import InnovationOpsMaterialReviewPage from './pages/innovation/InnovationOpsMaterialReviewPage'
 import InnovationOpsAiEvalPage from './pages/innovation/InnovationOpsAiEvalPage'
 import InnovationOpsAssignExpertsPage from './pages/innovation/InnovationOpsAssignExpertsPage'
 import InnovationOpsDecisionPage from './pages/innovation/InnovationOpsDecisionPage'
-import InnovationExpertTasksPage from './pages/innovation/InnovationExpertTasksPage'
 import InnovationExpertReviewWorkbenchPage from './pages/innovation/InnovationExpertReviewWorkbenchPage'
 import InnovationIndustryTrendsHubPage from './pages/innovation/v2/InnovationIndustryTrendsHubPage'
 import InnovationLeadDetailPage from './pages/innovation/v2/InnovationLeadDetailPage'
 import InnovationOutreachHub from './pages/innovation/v2/InnovationOutreachHub'
 import InnovationOutreachIndexPlaceholder from './pages/innovation/v2/InnovationOutreachIndexPlaceholder'
 import HatchMgmtLayout from './pages/hatch/HatchMgmtLayout'
-import HatchSigningPage from './pages/hatch/HatchSigningPage'
+import { HatchOpsWorkbenchPage } from './pages/hatch/HatchOpsWorkbenchPage'
 import HatchArchivePage from './pages/hatch/HatchArchivePage'
 import HatchArchiveDetailPage from './pages/hatch/HatchArchiveDetailPage'
 import HatchPhysicalSpacePage, { HatchSpaceDetailPage } from './pages/hatch/HatchPhysicalSpacePage'
-import HatchChangesPage from './pages/hatch/HatchChangesPage'
 import TwinInfraLayout from './pages/twin/TwinInfraLayout'
 import TwinInfraOverviewPage from './pages/twin/TwinInfraOverviewPage'
 import TwinInfraParksPage from './pages/twin/TwinInfraParksPage'
@@ -102,20 +97,20 @@ export default function App() {
           {/* 科创策源（演示：DemoProvider 仅包裹本前缀） */}
           <Route path="innovation" element={<InnovationSciShell />}>
             <Route index element={<InnovationIndexRedirect />} />
-            <Route path="applicant/projects" element={<InnovationApplicantProjectsPage />} />
+            <Route path="applicant/projects" element={<Navigate to="/innovation/ops/pool" replace />} />
             <Route path="applicant/register" element={<IncubationProjectRegisterWizardPage />} />
             <Route path="project/:projectId" element={<InnovationProjectDetailPage />} />
             <Route path="ops/workbench" element={<InnovationOpsWorkbenchPage />} />
             <Route path="ops/pool" element={<InnovationOpsPoolPage />} />
             <Route path="ops/ai-hub" element={<InnovationOpsAiHubPage />} />
-            <Route path="ops/expert-mgmt" element={<InnovationOpsExpertMgmtPage />} />
-            <Route path="ops/decision-hub" element={<InnovationOpsDecisionHubPage />} />
+            <Route path="ops/expert-mgmt" element={<Navigate to="/innovation/ops/workbench" replace />} />
+            <Route path="ops/decision-hub" element={<Navigate to="/innovation/ops/workbench" replace />} />
             <Route path="ops/projects" element={<Navigate to="/innovation/ops/pool" replace />} />
             <Route path="ops/review/:projectId" element={<InnovationOpsMaterialReviewPage />} />
             <Route path="ops/ai/:projectId" element={<InnovationOpsAiEvalPage />} />
             <Route path="ops/assign/:projectId" element={<InnovationOpsAssignExpertsPage />} />
             <Route path="ops/decision/:projectId" element={<InnovationOpsDecisionPage />} />
-            <Route path="expert/tasks" element={<InnovationExpertTasksPage />} />
+            <Route path="expert/tasks" element={<Navigate to="/innovation/ops/workbench" replace />} />
             <Route path="expert/review/:projectId" element={<InnovationExpertReviewWorkbenchPage />} />
             <Route path="industry-trends" element={<InnovationIndustryTrendsHubPage />} />
             <Route path="outreach" element={<InnovationOutreachHub />}>
@@ -132,14 +127,18 @@ export default function App() {
           {/* 入孵管理（精简菜单 + 共享演示状态） */}
           <Route path="hatch/identity" element={<Navigate to="/basic/dictionaries" replace />} />
           <Route path="hatch/exit" element={<Navigate to="/hatch/changes" replace />} />
-          <Route path="hatch/ai-permissions" element={<Navigate to="/hatch/signing" replace />} />
+          <Route path="hatch/ai-permissions" element={<Navigate to="/hatch/workbench" replace />} />
+          <Route path="hatch/signing" element={<Navigate to="/hatch/workbench" replace />} />
+          <Route path="hatch/signing/workbench" element={<Navigate to="/hatch/workbench" replace />} />
+          <Route path="hatch/signing/list" element={<Navigate to="/hatch/archive" replace />} />
+          <Route path="hatch/changes" element={<Navigate to="/hatch/workbench" replace />} />
           <Route path="hatch" element={<HatchMgmtLayout />}>
-            <Route path="signing" element={<HatchSigningPage />} />
+            <Route path="workbench" element={<HatchOpsWorkbenchPage />} />
+            <Route index element={<Navigate to="/hatch/workbench" replace />} />
             <Route path="archive" element={<HatchArchivePage />} />
             <Route path="archive/:projectId" element={<HatchArchiveDetailPage />} />
             <Route path="physical-space" element={<HatchPhysicalSpacePage />} />
             <Route path="physical-space/:allocationId" element={<HatchSpaceDetailPage />} />
-            <Route path="changes" element={<HatchChangesPage />} />
           </Route>
 
           {/* 资源运营 V1：统一演示上下文 */}

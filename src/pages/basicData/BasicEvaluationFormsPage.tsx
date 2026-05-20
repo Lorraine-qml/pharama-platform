@@ -3,6 +3,7 @@ import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/ToastProvider'
 import { cn } from '../../utils/cn'
 import type { BasicDataStatus, EvaluationDimension, EvaluationForm, EvaluationIndicator, EvaluationScenario } from './basicDataTypes'
+import { buildScoringGuideText } from './evaluationFormGuide'
 import { useBasicDataDemo } from './BasicDataDemoContext'
 
 const SCENARIOS: EvaluationScenario[] = ['科创策源', '孵化评估', 'AI 撮合', '资源运营', '通用']
@@ -447,6 +448,19 @@ export default function BasicEvaluationFormsPage() {
                 ) : null}
               </div>
               <div className="flex flex-wrap gap-2">
+                <button
+                  type="button"
+                  disabled={editor.dimensions.length === 0}
+                  className="rounded-md border border-divider px-4 py-2.5 text-[13px] font-semibold shadow-sm hover:bg-page disabled:cursor-not-allowed disabled:opacity-40"
+                  onClick={() => {
+                    const text = buildScoringGuideText(editor)
+                    void navigator.clipboard.writeText(text).then(() => {
+                      toast.show('评分指南已复制到剪贴板，可发给专家参考', 'success')
+                    })
+                  }}
+                >
+                  导出评分指南
+                </button>
                 <button
                   type="button"
                   disabled={editor.dimensions.length === 0}

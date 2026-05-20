@@ -8,7 +8,7 @@ export function InnovationLegacyRoutes({ variant }: { variant: 'registration' | 
 
   switch (variant) {
     case 'registration':
-      return <Navigate to="/innovation/ops/workbench" replace />
+      return <Navigate to="/innovation/applicant/register" replace />
     case 'materials':
       return <Navigate to="/innovation/ops/pool" replace />
     case 'ai':

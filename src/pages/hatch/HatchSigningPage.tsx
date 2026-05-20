@@ -11,6 +11,7 @@ import { useContractTemplates } from '../../contexts/ContractTemplatesContext'
 import { hatchSignPillVariant } from '../../utils/listStatusVariants'
 import { cn } from '../../utils/cn'
 import { useHatchMgmt } from './HatchMgmtContext'
+import { SigningFlowProgressModal } from './SigningFlowProgressModal'
 import type { HatchIncubationType, HatchSignStatus, SigningContract } from './hatchTypes'
 
 const INC_TYPES: (HatchIncubationType | '全部')[] = ['全部', '实体', '虚拟', '服务商']
@@ -33,6 +34,7 @@ export default function HatchSigningPage() {
   const [signOpen, setSignOpen] = useState<SigningContract | null>(null)
   const [viewOpen, setViewOpen] = useState<SigningContract | null>(null)
   const [renewOpen, setRenewOpen] = useState<SigningContract | null>(null)
+  const [flowOpen, setFlowOpen] = useState<SigningContract | null>(null)
 
   const [signTplId, setSignTplId] = useState('')
   const [signFile, setSignFile] = useState('')
@@ -264,7 +266,10 @@ export default function HatchSigningPage() {
                           档案
                         </Link>
                       ) : null}
-                      <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setViewOpen(c)}>
+                      <button type="button" className="font-semibold text-primary hover:underline" onClick={() => setFlowOpen(c)}>
+                        流程进度
+                      </button>
+                      <button type="button" className="font-semibold text-muted hover:underline" onClick={() => setViewOpen(c)}>
                         查看
                       </button>
                     </div>
@@ -403,6 +408,8 @@ export default function HatchSigningPage() {
           </div>
         ) : null}
       </Modal>
+
+      <SigningFlowProgressModal contract={flowOpen} open={flowOpen != null} onClose={() => setFlowOpen(null)} />
     </div>
   )
 }

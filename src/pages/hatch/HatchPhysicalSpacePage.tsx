@@ -1,5 +1,5 @@
-import { Link, useNavigate, useParams } from 'react-router-dom'
-import { useMemo, useState } from 'react'
+import { Link, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import { Modal } from '../../components/Modal'
 import { useToast } from '../../components/ToastProvider'
@@ -15,6 +15,8 @@ export default function HatchPhysicalSpacePage() {
   const toast = useToast()
   const h = useHatchMgmt()
   const isOps = Boolean(user)
+  const [searchParams] = useSearchParams()
+  const fromProjectId = searchParams.get('projectId')
 
   const [fQ, setFQ] = useState('')
   const [allocOpen, setAllocOpen] = useState(false)
@@ -25,6 +27,13 @@ export default function HatchPhysicalSpacePage() {
   const [handPerson, setHandPerson] = useState('李四')
   const [projPick, setProjPick] = useState('h-proj-1')
 
+  useEffect(() => {
+    if (fromProjectId) {
+      setProjPick(fromProjectId)
+      setAllocOpen(true)
+    }
+  }, [fromProjectId])
+
   const rows = useMemo(() => {
     return h.allocations.filter((a) => !fQ.trim() || a.projectName.includes(fQ.trim()))
   }, [h.allocations, fQ])
@@ -34,7 +43,16 @@ export default function HatchPhysicalSpacePage() {
       <header className="flex flex-wrap items-center justify-between gap-3">
         <div>
           <h1 className="text-[18px] font-bold text-foreground">实体空间入孵管理</h1>
-          <p className="mt-1 text-[12px] text-muted">空间分配、交接与使用记录 · 孪生联动（演示）</p>
+          <p className="mt-1 text-[12px] text-muted">
+            由入孵运营工作台跳转 · 空间分配、交接与孪生联动（演示）
+            {fromProjectId ? (
+              <>
+                {' '}
+                · 当前项目：
+                <span className="font-semibold text-foreground">{h.archives.find((a) => a.id === fromProjectId)?.name ?? fromProjectId}</span>
+              </>
+            ) : null}
+          </p>
         </div>
         <div className="flex flex-wrap gap-2">
           <button type="button" className="rounded-md border border-divider px-3 py-2 text-[13px]" onClick={() => toast.show('筛选（演示）', 'info')}>

@@ -6,7 +6,6 @@ import { Modal } from '../../components/Modal'
 import { ModuleIntroCard } from '../../components/moduleIntro/ModuleIntroCard'
 import { useToast } from '../../components/ToastProvider'
 import { cn } from '../../utils/cn'
-import { useHatchMgmt } from '../hatch/HatchMgmtContext'
 import { useResopsV1 } from '../resops/ResopsV1Context'
 import type { ResResource } from '../resops/resopsV1Types'
 import { useTwinInfra } from './TwinInfraContext'
@@ -212,7 +211,6 @@ function demoHistoryLines(row: DisplayRow): string[] {
 export default function TwinResourceSpaceDistributionPage() {
   const toast = useToast()
   const { user } = useAuth()
-  const { archives } = useHatchMgmt()
   const { resources } = useResopsV1()
   const { spaces, buildingById } = useTwinInfra()
 
@@ -221,16 +219,7 @@ export default function TwinResourceSpaceDistributionPage() {
   const [statusFilter, setStatusFilter] = useState<'全部' | RowStatus>('全部')
   const [searchQ, setSearchQ] = useState('')
   const [page, setPage] = useState(1)
-  const [statusOverrides, setStatusOverrides] = useState<Record<string, RowStatus>>({})
-
   const [detailRow, setDetailRow] = useState<DisplayRow | null>(null)
-  const [bookingRow, setBookingRow] = useState<DisplayRow | null>(null)
-  const [bookDate, setBookDate] = useState(() => new Date().toISOString().slice(0, 10))
-  const [bookStart, setBookStart] = useState('14:00')
-  const [bookEnd, setBookEnd] = useState('16:00')
-  const [bookPurpose, setBookPurpose] = useState('')
-  const [bookTech, setBookTech] = useState(false)
-  const [bookTrain, setBookTrain] = useState(false)
 
   useEffect(() => {
     try {
@@ -243,17 +232,6 @@ export default function TwinResourceSpaceDistributionPage() {
   useEffect(() => {
     setPage(1)
   }, [typeFilter, statusFilter, searchQ])
-
-  const defaultProjectName = useMemo(
-    () => archives.find((a) => a.name.includes('基因'))?.name ?? archives[0]?.name ?? '基因治疗项目',
-    [archives],
-  )
-
-  const applicantName = useMemo(() => {
-    const raw = user?.displayName ?? ''
-    const part = raw.split('·')[0]?.trim()
-    return part || '张三（演示）'
-  }, [user?.displayName])
 
   const staticRows: Row[] = useMemo(() => {
     const mtg = spaces.find((s) => s.code === 'ZJ-A-2F-M01')
@@ -288,16 +266,14 @@ export default function TwinResourceSpaceDistributionPage() {
       .map((r) => ({ ...r, source: resources.find((x) => x.id === r.resourceId) }))
     const staticDisplay: DisplayRow[] = staticRows.map((r) => ({
       ...r,
-      status: statusOverrides[r.resourceId ?? r.id] ?? r.status,
       source: r.resourceId ? resources.find((x) => x.id === r.resourceId) : undefined,
     }))
     const resPart = fromRes.map((r) => ({
       ...r,
-      status: statusOverrides[r.id] ?? r.status,
       source: resources.find((x) => x.id === r.resourceId),
     }))
     return [...staticDisplay, ...resPart]
-  }, [resources, staticRows, statusOverrides])
+  }, [resources, staticRows])
 
   const forTypeCounts = useMemo(
     () => mergedRows.filter((r) => matchesSearch(r, searchQ)).filter((r) => statusFilter === '全部' || r.status === statusFilter),
@@ -362,40 +338,11 @@ export default function TwinResourceSpaceDistributionPage() {
     toast.show('已导出当前筛选结果为 CSV（演示）', 'success')
   }
 
-  const openBooking = (r: DisplayRow) => {
-    if (r.status !== '空闲') {
-      toast.show('当前资源不可预约（仅空闲可发起演示预约）', 'info')
-      return
-    }
-    setBookingRow(r)
-    setBookDate(new Date().toISOString().slice(0, 10))
-    setBookStart('14:00')
-    setBookEnd('16:00')
-    setBookPurpose('')
-    setBookTech(false)
-    setBookTrain(false)
-  }
-
-  const submitBooking = () => {
-    if (!bookingRow) return
-    if (!bookPurpose.trim()) {
-      toast.show('请填写使用用途', 'info')
-      return
-    }
-    const key = bookingRow.resourceId ?? bookingRow.id
-    setStatusOverrides((prev) => ({ ...prev, [key]: '已预约' }))
-    setBookingRow(null)
-    setDetailRow((d) => (d && (d.resourceId ?? d.id) === key ? { ...d, status: '已预约' } : d))
-    toast.show('预约成功（演示）：时段已占位，卡片状态已更新为「已预约」', 'success')
-  }
-
   const detailOpenHours = (r: DisplayRow) => r.source?.hours ?? '周一至周五 09:00–18:00（演示）'
   const detailOwner = (r: DisplayRow) => ({
     name: r.source?.contactName ?? (r.kind === '会议室' ? '行政前台' : '李工'),
     phone: r.source?.phone ?? '13812345678',
   })
-
-  const canBook = (r: DisplayRow) => r.status === '空闲'
 
   const pagination = (
     <div className="flex flex-wrap items-center justify-center gap-2 pt-2 text-[13px]">
@@ -427,7 +374,7 @@ export default function TwinResourceSpaceDistributionPage() {
         title="📌 资源空间分布"
         lines={[
           '孪生台账位置与资源运营上架资源对齐；类型 / 状态药丸带计数，可与搜索联动。',
-          '「详情」「预约」为弹窗交互（演示）；预约成功后本地状态更新为「已预约」，生产可接冲突校验与 WebSocket。',
+          '「详情」为弹窗查看；预约请前往「资源运营 → 资源目录」发起（与上架资源台账联动）。',
         ]}
       />
       <h1 className="text-lg font-bold text-foreground">资源空间分布</h1>
@@ -531,8 +478,6 @@ export default function TwinResourceSpaceDistributionPage() {
               const em = kindEmoji(r.kind, r.name)
               const chrome = cardStatusChrome(r.status)
               const extras = cardDetailRows(r)
-              const book = canBook(r)
-
               return (
                 <div key={r.id} className={cn('flex flex-col overflow-hidden rounded-xl border bg-card shadow-sm transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md', chrome)}>
                   <div className={cn('flex items-center gap-2 px-3 py-2 text-[12px] font-bold', kindHeaderBar(r.kind))}>
@@ -572,15 +517,6 @@ export default function TwinResourceSpaceDistributionPage() {
                       <button type="button" className="rounded-md border border-divider px-3 py-1.5 text-[12px] font-bold hover:bg-muted/40" onClick={() => setDetailRow(r)}>
                         详情
                       </button>
-                      {book ? (
-                        <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-bold text-white hover:bg-primary-hover" onClick={() => openBooking(r)}>
-                          预约
-                        </button>
-                      ) : (
-                        <button type="button" disabled className="cursor-not-allowed rounded-md border border-divider bg-muted/50 px-3 py-1.5 text-[12px] font-bold text-muted">
-                          预约
-                        </button>
-                      )}
                     </div>
                   </div>
                 </div>
@@ -607,7 +543,6 @@ export default function TwinResourceSpaceDistributionPage() {
                 {pagedRows.map((r) => {
                   const dot = statusDot(r.status)
                   const em = kindEmoji(r.kind, r.name)
-                  const book = canBook(r)
                   return (
                     <tr key={r.id} className="border-b border-divider/60 hover:bg-muted/10">
                       <td className="px-3 py-2">
@@ -634,18 +569,9 @@ export default function TwinResourceSpaceDistributionPage() {
                         {keyAttrSummary(r)}
                       </td>
                       <td className="px-3 py-2">
-                        <div className="flex flex-wrap gap-2">
-                          <button type="button" className="text-[12px] font-semibold text-primary hover:underline" onClick={() => setDetailRow(r)}>
-                            详情
-                          </button>
-                          {book ? (
-                            <button type="button" className="text-[12px] font-semibold text-primary hover:underline" onClick={() => openBooking(r)}>
-                              预约
-                            </button>
-                          ) : (
-                            <span className="text-[12px] font-semibold text-muted">预约</span>
-                          )}
-                        </div>
+                        <button type="button" className="text-[12px] font-semibold text-primary hover:underline" onClick={() => setDetailRow(r)}>
+                          详情
+                        </button>
                       </td>
                     </tr>
                   )
@@ -665,29 +591,24 @@ export default function TwinResourceSpaceDistributionPage() {
         footer={
           detailRow ? (
             <div className="flex w-full flex-wrap gap-2">
-              {canBook(detailRow) ? (
-                <button
-                  type="button"
-                  className="rounded-md bg-primary px-3 py-2 text-[12px] font-bold text-white hover:bg-primary-hover"
-                  onClick={() => {
-                    const d = detailRow
-                    setDetailRow(null)
-                    openBooking(d)
-                  }}
-                >
-                  预约此资源
-                </button>
-              ) : null}
               <button type="button" className="rounded-md border border-divider px-3 py-2 text-[12px] font-bold hover:bg-muted/40" onClick={() => toast.show('已加入收藏（演示）', 'info')}>
                 收藏
               </button>
               {detailRow.resourceId ? (
-                <Link
-                  to={`/resops/resource/${encodeURIComponent(detailRow.resourceId)}`}
-                  className="rounded-md border border-divider px-3 py-2 text-[12px] font-bold text-primary hover:bg-muted/40"
-                >
-                  打开台账页
-                </Link>
+                <>
+                  <Link
+                    to={`/resops/catalog?applyRes=${encodeURIComponent(detailRow.resourceId)}`}
+                    className="rounded-md bg-primary px-3 py-2 text-[12px] font-bold text-white hover:bg-primary-hover"
+                  >
+                    前往资源目录预约
+                  </Link>
+                  <Link
+                    to={`/resops/resource/${encodeURIComponent(detailRow.resourceId)}`}
+                    className="rounded-md border border-divider px-3 py-2 text-[12px] font-bold text-primary hover:bg-muted/40"
+                  >
+                    打开台账页
+                  </Link>
+                </>
               ) : null}
               <button type="button" className="ms-auto rounded-md border border-divider px-3 py-2 text-[12px] font-bold hover:bg-muted/40" onClick={() => setDetailRow(null)}>
                 关闭
@@ -761,91 +682,6 @@ export default function TwinResourceSpaceDistributionPage() {
         ) : null}
       </Modal>
 
-      <Modal
-        open={bookingRow != null}
-        title="预约资源"
-        onClose={() => setBookingRow(null)}
-        closeOnOverlayClick={false}
-        panelClassName="max-w-lg"
-        footer={
-          <>
-            <button type="button" className="rounded-md border border-divider px-4 py-2 text-[12px] font-bold hover:bg-muted/40" onClick={() => setBookingRow(null)}>
-              取消
-            </button>
-            <button type="button" className="rounded-md bg-primary px-4 py-2 text-[12px] font-bold text-white hover:bg-primary-hover" onClick={submitBooking}>
-              提交预约
-            </button>
-          </>
-        }
-      >
-        {bookingRow ? (
-          <div className="space-y-3 text-[13px]">
-            <ul className="space-y-1 rounded-lg border border-divider bg-muted/10 p-3 text-[12px]">
-              <li>
-                <span className="text-muted">资源名称：</span>
-                <span className="font-semibold">{bookingRow.name}</span>
-              </li>
-              <li>
-                <span className="text-muted">资源类型：</span>
-                {kindTypeLabel(bookingRow.kind, bookingRow.labShare)}
-              </li>
-              <li>
-                <span className="text-muted">位置：</span>
-                {bookingRow.location}
-              </li>
-              <li>
-                <span className="text-muted">开放时间：</span>
-                {detailOpenHours(bookingRow)}
-              </li>
-            </ul>
-            <div className="grid gap-3 sm:grid-cols-3">
-              <label className="text-[12px]">
-                <span className="font-semibold text-muted">预约日期</span>
-                <input type="date" className="mt-1 w-full rounded-md border border-divider bg-surface px-2 py-1.5" value={bookDate} onChange={(e) => setBookDate(e.target.value)} />
-              </label>
-              <label className="text-[12px]">
-                <span className="font-semibold text-muted">开始时间</span>
-                <input type="time" className="mt-1 w-full rounded-md border border-divider bg-surface px-2 py-1.5" value={bookStart} onChange={(e) => setBookStart(e.target.value)} />
-              </label>
-              <label className="text-[12px]">
-                <span className="font-semibold text-muted">结束时间</span>
-                <input type="time" className="mt-1 w-full rounded-md border border-divider bg-surface px-2 py-1.5" value={bookEnd} onChange={(e) => setBookEnd(e.target.value)} />
-              </label>
-            </div>
-            <label className="block text-[12px]">
-              <span className="font-semibold text-muted">使用用途</span>
-              <textarea
-                className="mt-1 w-full rounded-md border border-divider bg-surface px-2 py-2 text-[13px]"
-                rows={2}
-                placeholder="例：细胞表面标记分析实验"
-                value={bookPurpose}
-                onChange={(e) => setBookPurpose(e.target.value)}
-              />
-            </label>
-            <div className="flex flex-wrap gap-4 text-[12px]">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={bookTech} onChange={(e) => setBookTech(e.target.checked)} />
-                需要技术人员协助
-              </label>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="checkbox" checked={bookTrain} onChange={(e) => setBookTrain(e.target.checked)} />
-                需要培训
-              </label>
-            </div>
-            <ul className="space-y-0.5 text-[12px] text-muted">
-              <li>
-                <span className="text-muted">预约人：</span>
-                {applicantName}
-              </li>
-              <li>
-                <span className="text-muted">所属项目：</span>
-                {defaultProjectName}
-              </li>
-            </ul>
-            <p className="rounded-md border border-[#FF8A34]/30 bg-[#FF8A34]/10 px-2 py-1.5 text-[11px] text-[#A65000]">请按时使用；取消需提前 2 小时（演示规则）。</p>
-          </div>
-        ) : null}
-      </Modal>
     </div>
   )
 }

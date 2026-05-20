@@ -226,11 +226,11 @@ export default function InnovationOpsDecisionPage() {
           const q = new URLSearchParams()
           q.set('highlightContract', contractId)
           if (archiveId) q.set('projectId', archiveId)
-          navigate(`/hatch/signing?${q.toString()}`)
+          navigate(`/hatch/workbench?${q.toString()}`)
         }}
         onManualSign={(aid) => {
           setPostSubmit(null)
-          navigate(`/hatch/signing?projectId=${encodeURIComponent(aid)}`)
+          navigate(`/hatch/workbench?projectId=${encodeURIComponent(aid)}`)
         }}
       />
     </div>
@@ -303,7 +303,7 @@ function ResultModal({
             手动创建签约
           </button>
         ) : (
-          <Link to="/hatch/signing" className="rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:bg-primary-hover" onClick={onClose}>
+          <Link to="/hatch/workbench" className="rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-white hover:bg-primary-hover" onClick={onClose}>
             打开签约管理
           </Link>
         )}

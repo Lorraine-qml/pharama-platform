@@ -48,10 +48,8 @@ export const NAV_SECTIONS: NavSection[] = [
     label: '入孵管理',
     icon: '🏛️',
     children: [
-      { to: '/hatch/signing', label: '入孵签约管理' },
+      { to: '/hatch/workbench', label: '入孵运营工作台' },
       { to: '/hatch/archive', label: '入孵项目档案' },
-      { to: '/hatch/physical-space', label: '实体空间入孵管理' },
-      { to: '/hatch/changes', label: '项目变更管理' },
     ],
   },
   {
@@ -170,12 +168,8 @@ export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
   return [
     { to: '/innovation/ops/workbench', label: '任务中心（园区运营）' },
     { to: '/innovation/ops/pool', label: '候选项目池（园区运营）' },
+    { to: '/innovation/applicant/register', label: '新增项目（园区运营）' },
     { to: '/innovation/ops/ai-hub', label: 'AI 智能评估（园区运营）' },
-    { to: '/innovation/ops/expert-mgmt', label: '专家评审管理（园区运营）' },
-    { to: '/innovation/ops/decision-hub', label: '入孵决策管理（园区运营）' },
-    { to: '/innovation/applicant/projects', label: '我的项目（申报方）' },
-    { to: '/innovation/applicant/register', label: '新建项目（申报方）' },
-    { to: '/innovation/expert/tasks', label: '我的评审任务（专家）' },
     { to: '/innovation/industry-trends', label: '行业趋势分析（V2 预留）' },
     { to: '/innovation/outreach', label: '招商触达辅助（V2 预留）' },
   ]

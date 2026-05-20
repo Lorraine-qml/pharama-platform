@@ -248,7 +248,7 @@ export default function InnovationProjectDetailPage() {
     return (
       <div className="rounded-[var(--radius-panel)] border border-divider bg-surface p-8 text-[14px] text-muted">
         未找到该项目。
-        <Link to="/innovation/applicant/projects" className="ms-3 text-primary">
+        <Link to="/innovation/ops/pool" className="ms-3 text-primary">
           返回
         </Link>
       </div>
@@ -287,10 +287,6 @@ export default function InnovationProjectDetailPage() {
         <Link to="/innovation/ops/pool" className="hover:text-primary">
           候选项目池
         </Link>
-        <span aria-hidden>·</span>
-        <Link to="/innovation/applicant/projects" className="hover:text-primary">
-          我的项目
-        </Link>
         <span aria-hidden>/</span>
         <span className="font-semibold text-foreground">{proj.name}</span>
       </nav>
@@ -322,14 +318,6 @@ export default function InnovationProjectDetailPage() {
           </Link>
           {isApplicantPerspective ? (
             <>
-              {proj.stage === 'returned_supplement' ? (
-                <Link
-                  to="/innovation/applicant/register"
-                  className="rounded-md bg-warning px-3 py-2 text-[13px] font-bold text-white shadow-sm hover:opacity-95"
-                >
-                  补充资料（向导）
-                </Link>
-              ) : null}
               {proj.stage === 'returned_supplement' ? (
                 <button
                   type="button"
@@ -838,7 +826,7 @@ export default function InnovationProjectDetailPage() {
                 withdrawProject(proj.id)
                 setWithdrawOpen(false)
                 toast.show('本条申请已从草稿列表移除（演示）。', 'warning')
-                navigate('/innovation/applicant/projects')
+                navigate('/innovation/ops/pool')
               }}
             >
               撤回

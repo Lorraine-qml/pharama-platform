@@ -6,7 +6,8 @@ import { useToast } from '../../components/ToastProvider'
 import { cn } from '../../utils/cn'
 import { reviewsForResource } from './resopsV1Mock'
 import { useResopsV1 } from './ResopsV1Context'
-import { demoApplicantForRole, feeSummary, RESOURCE_STATUS_LABEL } from './resopsV1Labels'
+import { feeSummary, RESOURCE_STATUS_LABEL } from './resopsV1Labels'
+import { canBookResResource, ResourceBookingModal } from './ResourceBookingModal'
 import type { ResOpenScope } from './resopsV1Types'
 import {
   isMainStepCompleted,
@@ -36,19 +37,17 @@ export default function ResopsResourceDetailPage() {
   const { resourceId } = useParams<{ resourceId: string }>()
   const { user } = useAuth()
   const toast = useToast()
-  const { resources, submitApplication, setResourceStatus, publishResource, updateResource } = useResopsV1()
+  const { resources, setResourceStatus, publishResource, updateResource } = useResopsV1()
   const [tab, setTab] = useState<(typeof TABS)[number]['id']>('base')
   const [bookOpen, setBookOpen] = useState(false)
   const [bindOpen, setBindOpen] = useState(false)
   const [bindInput, setBindInput] = useState('')
-  const [slot, setSlot] = useState('05-28 09:00-11:00')
   const [stepTip, setStepTip] = useState<string | null>(null)
 
   const r = useMemo(() => resources.find((x) => x.id === resourceId), [resources, resourceId])
   const reviews = useMemo(() => (resourceId ? reviewsForResource(resourceId) : []), [resourceId])
 
   const showOps = Boolean(user)
-  const applicant = user ? demoApplicantForRole(user.role) : { key: '', label: '' }
 
   if (!user) return <Navigate to="/login" replace />
   if (!r) return <p className="text-[13px] text-muted">未找到资源。</p>
@@ -77,7 +76,7 @@ export default function ResopsResourceDetailPage() {
           ← 返回资源管理
         </Link>
         <div className="flex flex-wrap gap-2">
-          {res.status === 'listed' ? (
+          {res.status === 'listed' && canBookResResource(res) ? (
             <button type="button" onClick={() => setBookOpen(true)} className="rounded-md bg-primary px-4 py-2 text-[13px] font-bold text-white shadow-sm hover:bg-primary-hover">
               立即预约
             </button>
@@ -360,29 +359,7 @@ export default function ResopsResourceDetailPage() {
         </section>
       ) : null}
 
-      <Modal open={bookOpen} title="发起预约申请" onClose={() => setBookOpen(false)} panelClassName="max-w-md">
-        <p className="text-[12px] text-muted">申请方：{applicant.label}</p>
-        <label className="mt-3 block text-[13px] text-muted">
-          使用时段
-          <input className="mt-1 w-full rounded-md border border-divider px-3 py-2" value={slot} onChange={(e) => setSlot(e.target.value)} />
-        </label>
-        <div className="mt-4 flex justify-end gap-2">
-          <button type="button" className="rounded-md border border-divider px-3 py-2 text-[13px]" onClick={() => setBookOpen(false)}>
-            取消
-          </button>
-          <button
-            type="button"
-            className="rounded-md bg-primary px-3 py-2 text-[13px] font-bold text-white"
-            onClick={() => {
-              submitApplication({ resourceId: res.id, applicantKey: applicant.key, applicantLabel: applicant.label, slot })
-              setBookOpen(false)
-              toast.show('申请已提交 · 待提供方确认', 'success')
-            }}
-          >
-            提交申请
-          </button>
-        </div>
-      </Modal>
+      <ResourceBookingModal resource={res} open={bookOpen} onClose={() => setBookOpen(false)} />
 
       <Modal open={bindOpen} title="孪生空间绑定" onClose={() => setBindOpen(false)} panelClassName="max-w-md">
         <textarea className="mt-1 w-full rounded-md border border-divider px-3 py-2 text-[13px]" rows={3} value={bindInput} onChange={(e) => setBindInput(e.target.value)} />

@@ -4,9 +4,31 @@ export type HatchIncubationType = '实体' | '虚拟' | '服务商'
 
 export type HatchSignStatus = '待签署' | '已生效' | '即将到期' | '已到期' | '已终止' | '续约中'
 
+export type SigningFlowStepKey = 'pending_sign' | 'signing' | 'active' | 'expiring' | 'terminated'
+
+export type SigningFlowEvent = {
+  id: string
+  stepKey: SigningFlowStepKey
+  nodeLabel: string
+  status: string
+  completedAt: string
+  operator: string
+  opinion?: string
+}
+
 export type HatchProjectStatus = '待审核' | '待签约' | '正常运营' | '暂停' | '毕业' | '退出'
 
 export type FlowNodeKey = 'decision' | 'signing' | 'archive' | 'space' | 'operate' | 'graduate'
+
+export type ContractRemindLog = {
+  id: string
+  contractId: string
+  /** 30 / 15 / 7 或 -1 表示手动 */
+  remindDay: number
+  remindTime: string
+  method: string
+  status: '成功' | '失败'
+}
 
 export type SigningContract = {
   id: string
@@ -17,12 +39,93 @@ export type SigningContract = {
   contractEnd: string | null
   rentYuanPerMonth: number | null
   propertyFee?: number
+  techFeeYuanPerMonth?: number
   aiPackage?: string
   spaceNeed?: string
   templateId?: string
+  templateName?: string
   termStart?: string
   termEnd?: string
   scanFileName?: string
+  /** 合同附件文件名列表（演示） */
+  contractAttachments?: string[]
+  contractRemark?: string
+  createdAt?: string
+  crmContractId?: string
+  remindLogs?: ContractRemindLog[]
+  /** 到期提醒任务处理状态（演示） */
+  expireRemindHandled?: boolean
+  /** 签约流程节点流转记录（演示 / API） */
+  flowEvents?: SigningFlowEvent[]
+}
+
+export type SigningTaskKind = 'sign' | 'renew' | 'expire_remind'
+
+export type SigningWorkbenchTab = 'todo' | 'in_progress' | 'done'
+
+/** 入孵运营工作台 · 统一任务类型 */
+export type HatchOpsTaskKind =
+  | 'sign'
+  | 'space'
+  | 'change'
+  | 'exit'
+  | 'renew'
+  | 'expire_remind'
+
+export type HatchOpsWorkbenchTab = 'todo' | 'in_progress' | 'done'
+
+export type HatchOpsWorkbenchTask = {
+  id: string
+  kind: HatchOpsTaskKind
+  tab: HatchOpsWorkbenchTab
+  projectId: string
+  projectName: string
+  timeLabel: string
+  summary: string
+  statusLabel: string
+  overdue?: boolean
+  contractId?: string
+  changeId?: string
+  templateLabel?: string
+  contractEnd?: string | null
+  daysLeft?: number | null
+  remindStatus?: string
+  decisionNote?: string
+}
+
+/** 签约工作台任务（可与 contract 关联或决策通过后仅任务） */
+export type SigningWorkbenchTask = {
+  id: string
+  kind: SigningTaskKind
+  tab: SigningWorkbenchTab
+  projectId: string
+  projectName: string
+  createdAt: string
+  statusLabel: string
+  contractId?: string
+  templateLabel?: string
+  contractEnd?: string | null
+  daysLeft?: number | null
+  remindStatus?: string
+  overdue?: boolean
+  /** 决策通过说明（仅签约类任务） */
+  decisionNote?: string
+}
+
+export type SigningConfirmPayload = {
+  projectId: string
+  projectName: string
+  incubationType: HatchIncubationType
+  templateId: string
+  termStart: string
+  termEnd: string
+  rentYuanPerMonth: number
+  propertyFee: number
+  techFeeYuanPerMonth: number
+  aiPackage: string
+  scanFileName?: string
+  contractAttachments?: string[]
+  contractRemark?: string
 }
 
 export type PipelineItem = {

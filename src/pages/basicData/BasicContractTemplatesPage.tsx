@@ -109,7 +109,7 @@ export default function BasicContractTemplatesPage() {
         <h1 className="mt-1 text-[21px] font-bold text-foreground">合同模板管理</h1>
         <p className="mt-2 text-[13px] text-muted">
           维护入孵协议、租赁补充、服务协议等模板（非具体合同实例）。与
-          <Link to="/hatch/signing" className="mx-1 font-semibold text-primary hover:underline">
+          <Link to="/hatch/workbench" className="mx-1 font-semibold text-primary hover:underline">
             入孵签约管理
           </Link>
           联动：签约时仅可选择「启用中」且适用类型匹配的模板。

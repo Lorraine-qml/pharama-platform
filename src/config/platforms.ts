@@ -9,7 +9,7 @@ export const PLATFORM_OPTIONS: { id: PlatformId; label: string }[] = [
   { id: 'cockpit', label: '运营驾驶舱' },
   { id: 'incubation', label: '孵化运营平台' },
   { id: 'ai', label: 'AI 能力中台' },
-  { id: 'eagle-data', label: '鹰翼数据中台' },
+  { id: 'eagle-data', label: '禹翼数据中台' },
 ]
 
 /** 与各子平台对应的侧边栏分组 key（与 navigation.ts 中 NavSection.key 对齐） */

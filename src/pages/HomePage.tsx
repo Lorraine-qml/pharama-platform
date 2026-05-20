@@ -170,11 +170,7 @@ export default function HomePage() {
       title: '入孵项目',
       value: String(metrics.incubatingProjects),
       sub: '含实体 + 虚拟',
-      to: can('/innovation/applicant/projects')
-        ? '/innovation/applicant/projects'
-        : can('/innovation/ops/workbench')
-          ? '/innovation/ops/workbench'
-          : undefined,
+      to: can('/innovation/ops/workbench') ? '/innovation/ops/workbench' : can('/innovation/ops/pool') ? '/innovation/ops/pool' : undefined,
     },
     {
       title: '资源使用率',
@@ -205,20 +201,13 @@ export default function HomePage() {
     {
       t: '待专家评审',
       n: 2,
-      to: can('/innovation/expert/tasks') ? '/innovation/expert/tasks' : '/innovation/ops/workbench',
+      to: '/innovation/ops/workbench',
       act: '去评审',
     },
-    { t: '合同到期提醒', n: 1, to: '/hatch/signing', act: '去续约' },
+    { t: '合同到期提醒', n: 1, to: '/hatch/workbench', act: '去续约' },
   ]
 
-  const innovEntry =
-    can('/innovation/applicant/register')
-      ? '/innovation/applicant/register'
-      : can('/innovation/applicant/projects')
-        ? '/innovation/applicant/projects'
-        : can('/innovation/ops/workbench')
-          ? '/innovation/ops/workbench'
-          : '/'
+  const innovEntry = can('/innovation/ops/workbench') ? '/innovation/ops/workbench' : '/innovation/ops/pool'
 
   const quickEntries: { label: string; to: string; skill?: string }[] = [
     {
@@ -227,10 +216,10 @@ export default function HomePage() {
       skill: 'project_pre_score',
     },
     { label: '资源发布', to: '/resops/mgmt' },
-    { label: '入孵签约', to: '/hatch/signing' },
+    { label: '入孵签约', to: '/hatch/workbench' },
     {
       label: '专家评审',
-      to: can('/innovation/expert/tasks') ? '/innovation/expert/tasks' : '/innovation/ops/workbench',
+      to: '/innovation/ops/workbench',
       skill: 'AI 推荐',
     },
     { label: '数据看板', to: '/cockpit' },

@@ -1,19 +1,30 @@
-import { Link } from 'react-router-dom'
+import { Link, useSearchParams } from 'react-router-dom'
 import { useCallback, useEffect, useMemo, useState } from 'react'
 import { useAuth } from '../../auth/AuthContext'
 import type { UserRole } from '../../auth/types'
 import { Modal } from '../../components/Modal'
-import { StatusPill } from '../../components/ui/StatusPill'
+import { AiEvaluationWizardModal } from './AiEvaluationWizardModal'
+import { ExpertAssignModal } from './ExpertAssignModal'
+import { ExpertReviewModal } from './ExpertReviewModal'
+import { IncubationDecisionModal } from './IncubationDecisionModal'
+import { MaterialReviewModal } from './MaterialReviewModal'
 import { useToast } from '../../components/ToastProvider'
 import { cn } from '../../utils/cn'
 import type { SjProject } from './innovationTypes'
-import { DEMO_EXPERT_ZHANG_ID, applicantStatusFromStage, applicantStatusTone } from './innovationTypes'
+import { DEMO_EXPERT_ZHANG_ID } from './innovationTypes'
 import { useInnovationDemo } from './InnovationDemoContext'
-import { poolStagePillVariant, poolStatusLabel } from './innovationPoolLabels'
+import {
+  WORKBENCH_DONE_SEED,
+  WORKBENCH_IN_PROGRESS_SEED,
+  WORKBENCH_INITIATED_SEED,
+  WORKBENCH_TODO_SEED,
+  type InProgressRowSeed,
+  type InitiatedRowSeed,
+  type TaskKind,
+  type TodoRowSeed,
+} from './innovationWorkbenchSeed'
 
-type TaskTab = 'todo' | 'done' | 'initiated'
-
-type TaskKind = 'material' | 'ai' | 'assign' | 'expert' | 'decision'
+type TaskTab = 'todo' | 'in_progress' | 'done' | 'initiated'
 
 type TodoRow = {
   id: string
@@ -37,11 +48,18 @@ type DoneRow = {
   result: string
   at: string
   actor?: string
+  detailKind: 'default' | 'report' | 'signing'
 }
 
-const PAGE_SIZE = 8
+const PAGE_SIZE = 20
+
+const DEMO_OVERDUE_KPI = 2
 
 const TYPE_FILTER_OPTS = ['全部', '资料审核', 'AI评估', '专家分配', '入孵决策', '项目评审'] as const
+
+const opLinkPrimary = 'shrink-0 text-[12px] font-semibold text-primary hover:underline'
+const opLinkMuted = 'shrink-0 text-[12px] font-semibold text-muted hover:text-primary hover:underline'
+const opLinkUrge = 'shrink-0 text-[12px] font-semibold text-amber-700 hover:underline dark:text-amber-400'
 
 function parseRoughTime(s: string): number {
   const t = Date.parse(s.replace(/(\d{4}-\d{2}-\d{2})\s+(\d{2}:\d{2})/, '$1T$2'))
@@ -60,13 +78,72 @@ function todoStatus(p: SjProject, kind: TaskKind): '待处理' | '处理中' | '
   return '待处理'
 }
 
-function buildTodoRows(projects: SjProject[], role: UserRole): TodoRow[] {
+function seedTodoToRow(s: TodoRowSeed): TodoRow {
+  return { ...s }
+}
+
+function seedDoneToRow(s: (typeof WORKBENCH_DONE_SEED)[number]): DoneRow {
+  return { ...s }
+}
+
+function buildExpertTodoRows(projects: SjProject[]): TodoRow[] {
   const rows: TodoRow[] = []
+  for (const p of projects) {
+    if (p.stage !== 'expert_reviewing') continue
+    const slot = p.experts.find((e) => e.expertId === DEMO_EXPERT_ZHANG_ID && e.state !== 'done')
+    if (!slot) continue
+    rows.push({
+      id: `expert-${p.id}`,
+      kind: 'expert',
+      typeLabel: '项目评审',
+      projectId: p.id,
+      projectName: p.name,
+      createdAt: p.submittedAt.slice(0, 10),
+      statusLabel: todoStatus(p, 'expert'),
+      actionLabel: '去评审',
+      href: `/innovation/expert/review/${p.id}`,
+      batchKey: null,
+    })
+  }
+  return rows
+}
+
+function buildTodoRows(projects: SjProject[], role: UserRole): TodoRow[] {
   const isExpert = role === 'expert'
   const isOps = role === 'platform' || role === 'enterprise-admin'
 
-  if (!isExpert || isOps) {
-    for (const p of projects) {
+  if (isOps) {
+    return WORKBENCH_TODO_SEED.map(seedTodoToRow)
+      .filter((row) => {
+        const p = projects.find((x) => x.id === row.projectId)
+        if (!p) return true
+        if (row.kind === 'ai' && p.aiReport) return false
+        if (
+          row.kind === 'material' &&
+          p.stage !== 'pending_material_review' &&
+          p.stage !== 'returned_supplement'
+        ) {
+          return false
+        }
+        if (row.kind === 'assign' && p.stage !== 'pending_expert_assign') return false
+        if (row.kind === 'decision' && p.stage !== 'pending_decision') return false
+        return true
+      })
+      .map((row) => {
+        if (row.kind !== 'ai') return row
+        const p = projects.find((x) => x.id === row.projectId)
+        if (p?.aiReport) {
+          return { ...row, actionLabel: '查看结果', href: `/innovation/ops/ai/${row.projectId}` }
+        }
+        return row
+      })
+  }
+  if (isExpert) {
+    return buildExpertTodoRows(projects)
+  }
+
+  const rows: TodoRow[] = []
+  for (const p of projects) {
       if (p.stage === 'pending_material_review' || p.stage === 'returned_supplement') {
         rows.push({
           id: `material-${p.id}`,
@@ -124,75 +201,16 @@ function buildTodoRows(projects: SjProject[], role: UserRole): TodoRow[] {
         })
       }
     }
-  }
-
-  if (isExpert || isOps) {
-    for (const p of projects) {
-      if (p.stage !== 'expert_reviewing') continue
-      if (isOps) {
-        rows.push({
-          id: `expert-${p.id}`,
-          kind: 'expert',
-          typeLabel: '项目评审',
-          projectId: p.id,
-          projectName: p.name,
-          createdAt: p.submittedAt.slice(0, 10),
-          statusLabel: todoStatus(p, 'expert'),
-          actionLabel: '查看/催办',
-          href: `/innovation/project/${p.id}?tab=experts`,
-          batchKey: null,
-        })
-        continue
-      }
-      const slot = p.experts.find((e) => e.expertId === DEMO_EXPERT_ZHANG_ID && e.state !== 'done')
-      if (!slot) continue
-      rows.push({
-        id: `expert-${p.id}`,
-        kind: 'expert',
-        typeLabel: '项目评审',
-        projectId: p.id,
-        projectName: p.name,
-        createdAt: p.submittedAt.slice(0, 10),
-        statusLabel: todoStatus(p, 'expert'),
-        actionLabel: '去评审',
-        href: `/innovation/expert/review/${p.id}`,
-        batchKey: null,
-      })
-    }
-  }
-
   return rows
 }
 
-function buildDoneRows(projects: SjProject[]): DoneRow[] {
+function buildDoneRows(projects: SjProject[], role: UserRole): DoneRow[] {
+  const isOps = role === 'platform' || role === 'enterprise-admin'
+  if (isOps) {
+    return WORKBENCH_DONE_SEED.map(seedDoneToRow)
+  }
   const rows: DoneRow[] = []
   for (const p of projects) {
-    if (p.id === 'sj-106' && p.stage === 'decision_pass') {
-      rows.push(
-        { id: `${p.id}-d1`, typeLabel: '资料审核', projectName: p.name, projectId: p.id, result: '通过', at: '2025-05-10 14:32', actor: '李四（运营初审）' },
-        {
-          id: `${p.id}-d2`,
-          typeLabel: 'AI评估',
-          projectName: p.name,
-          projectId: p.id,
-          result: p.aiReport ? `完成（${p.aiReport.overall}分）` : '完成',
-          at: p.aiEvaluatedAt ?? '2025-05-11 09:00',
-          actor: '系统',
-        },
-        { id: `${p.id}-d3`, typeLabel: '专家分配', projectName: p.name, projectId: p.id, result: '已分配 3 人', at: '2025-05-11 10:05', actor: '王五（运营）' },
-        { id: `${p.id}-d4`, typeLabel: '专家评审', projectName: p.name, projectId: p.id, result: '已完成', at: '2025-05-15 18:00', actor: '专家组' },
-        {
-          id: `${p.id}-d5`,
-          typeLabel: '入孵决策',
-          projectName: p.name,
-          projectId: p.id,
-          result: '通过（实体入孵）',
-          at: p.decisionAt ?? '2025-05-16 10:30',
-          actor: p.decisionBy ?? '运营主管',
-        },
-      )
-      continue
-    }
     if (p.stage === 'decision_pass' && p.decisionAt) {
       rows.push({
         id: `${p.id}-dec`,
@@ -202,6 +220,7 @@ function buildDoneRows(projects: SjProject[]): DoneRow[] {
         result: p.decisionChoice === 'physical' ? '通过（实体入孵）' : p.decisionChoice === 'virtual' ? '通过（虚拟入孵）' : '通过',
         at: p.decisionAt,
         actor: p.decisionBy,
+        detailKind: 'signing',
       })
     }
     if (p.stage === 'decision_reject' && p.decisionAt) {
@@ -213,10 +232,18 @@ function buildDoneRows(projects: SjProject[]): DoneRow[] {
         result: '不予通过',
         at: p.decisionAt,
         actor: p.decisionBy,
+        detailKind: 'default',
       })
     }
   }
   return rows.sort((a, b) => String(b.at).localeCompare(String(a.at)))
+}
+
+function inProgressMatchesFilter(row: InProgressRowSeed, filter: (typeof TYPE_FILTER_OPTS)[number]): boolean {
+  if (filter === '全部') return true
+  if (filter === '项目评审') return row.typeLabel.includes('评审')
+  if (filter === '资料审核') return false
+  return row.typeLabel === filter || (filter === '入孵决策' && row.kind === 'decision')
 }
 
 function typeLabelMatchesTabFilter(rowTypeLabel: string, filter: (typeof TYPE_FILTER_OPTS)[number]): boolean {
@@ -241,6 +268,7 @@ export default function InnovationOpsWorkbenchPage() {
   const { user } = useAuth()
   const role = user?.role ?? 'member'
   const { projects, passMaterialReview, returnMaterialReview, urgeExpert, batchFinalizeAiEval } = useInnovationDemo()
+  const [searchParams, setSearchParams] = useSearchParams()
 
   const [tab, setTab] = useState<TaskTab>('todo')
   const [q, setQ] = useState('')
@@ -249,13 +277,53 @@ export default function InnovationOpsWorkbenchPage() {
   const [sel, setSel] = useState<Record<string, boolean>>({})
 
   const [materialModal, setMaterialModal] = useState<SjProject | null>(null)
-  const [matComment, setMatComment] = useState('')
-  const [matOutcome, setMatOutcome] = useState<'pass' | 'return'>('pass')
+  const [aiEvalProject, setAiEvalProject] = useState<SjProject | null>(null)
+  const [assignProject, setAssignProject] = useState<SjProject | null>(null)
+  const [decisionProject, setDecisionProject] = useState<SjProject | null>(null)
+  const [reviewProject, setReviewProject] = useState<SjProject | null>(null)
   const [doneDetail, setDoneDetail] = useState<DoneRow | null>(null)
 
+  const isOps = role === 'platform' || role === 'enterprise-admin'
+
   const todoRows = useMemo(() => buildTodoRows(projects, role), [projects, role])
-  const doneRows = useMemo(() => buildDoneRows(projects), [projects])
-  const initiatedRows = useMemo(() => projects.filter((p) => p.applicantOwned), [projects])
+  const inProgressRows = useMemo(() => {
+    if (!isOps) return []
+    const seedIds = new Set(WORKBENCH_IN_PROGRESS_SEED.map((r) => r.projectId).filter(Boolean))
+    const dynamic: InProgressRowSeed[] = []
+    for (const p of projects) {
+      if (seedIds.has(p.id)) continue
+      if (p.stage === 'expert_reviewing') {
+        const done = p.experts.filter((e) => e.state === 'done').length
+        const total = p.experts.length
+        dynamic.push({
+          id: `prog-expert-${p.id}`,
+          kind: 'expert',
+          typeLabel: '专家评审',
+          projectName: p.name,
+          projectId: p.id,
+          createdAt: p.submittedAt.slice(0, 10),
+          progressLabel: total ? `已提交 ${done}/${total} 位专家` : '等待专家提交',
+          canUrge: true,
+          href: `/innovation/project/${p.id}?tab=experts`,
+        })
+      } else if (p.stage === 'pending_ai' && p.aiReport) {
+        dynamic.push({
+          id: `prog-ai-done-${p.id}`,
+          kind: 'ai',
+          typeLabel: 'AI评估',
+          projectName: p.name,
+          projectId: p.id,
+          createdAt: p.submittedAt.slice(0, 10),
+          progressLabel: `评估完成（${p.aiReport.overall}分），待分配专家`,
+          canUrge: false,
+          href: `/innovation/ops/ai/${p.id}`,
+        })
+      }
+    }
+    return [...WORKBENCH_IN_PROGRESS_SEED, ...dynamic]
+  }, [isOps, projects])
+  const doneRows = useMemo(() => buildDoneRows(projects, role), [projects, role])
+  const initiatedRows = useMemo(() => (isOps ? WORKBENCH_INITIATED_SEED : []), [isOps])
 
   const filteredTodos = useMemo(() => {
     const k = typeF === '全部' ? null : kindFromTypeFilter(typeF)
@@ -274,27 +342,55 @@ export default function InnovationOpsWorkbenchPage() {
     })
   }, [doneRows, typeF, q])
 
+  const filteredInProgress = useMemo(() => {
+    return inProgressRows.filter((r) => {
+      if (!inProgressMatchesFilter(r, typeF)) return false
+      if (q.trim() && !r.projectName.includes(q.trim()) && !r.typeLabel.includes(q.trim())) return false
+      return true
+    })
+  }, [inProgressRows, typeF, q])
+
   const filteredInitiated = useMemo(() => {
-    return initiatedRows.filter((p) => {
-      if (q.trim() && !p.name.includes(q.trim()) && !p.orgFullName.includes(q.trim())) return false
+    return initiatedRows.filter((r) => {
+      if (q.trim() && !r.name.includes(q.trim()) && !r.flowType.includes(q.trim())) return false
       return true
     })
   }, [initiatedRows, q])
 
-  const overdueCount = useMemo(() => todoRows.filter((r) => r.statusLabel === '超时').length, [todoRows])
+  const overdueCount = useMemo(() => {
+    if (isOps) return DEMO_OVERDUE_KPI
+    return todoRows.filter((r) => r.statusLabel === '超时').length
+  }, [isOps, todoRows])
 
   useEffect(() => {
     setPage(1)
   }, [tab, typeF, q])
 
-  const totalPages = Math.max(
-    1,
-    Math.ceil((tab === 'todo' ? filteredTodos.length : tab === 'done' ? filteredDone.length : filteredInitiated.length) / PAGE_SIZE),
-  )
+  useEffect(() => {
+    const reviewId = searchParams.get('review')
+    if (!reviewId) return
+    const p = projects.find((x) => x.id === reviewId)
+    if (p) setReviewProject(p)
+    const next = new URLSearchParams(searchParams)
+    next.delete('review')
+    setSearchParams(next, { replace: true })
+  }, [searchParams, projects, setSearchParams])
+
+  const activeTotal =
+    tab === 'todo'
+      ? filteredTodos.length
+      : tab === 'in_progress'
+        ? filteredInProgress.length
+        : tab === 'done'
+          ? filteredDone.length
+          : filteredInitiated.length
+
+  const totalPages = Math.max(1, Math.ceil(activeTotal / PAGE_SIZE))
   const pageSafe = Math.min(page, totalPages)
   const sliceStart = (pageSafe - 1) * PAGE_SIZE
 
   const pagedTodos = filteredTodos.slice(sliceStart, sliceStart + PAGE_SIZE)
+  const pagedInProgress = filteredInProgress.slice(sliceStart, sliceStart + PAGE_SIZE)
   const pagedDone = filteredDone.slice(sliceStart, sliceStart + PAGE_SIZE)
   const pagedInit = filteredInitiated.slice(sliceStart, sliceStart + PAGE_SIZE)
 
@@ -323,22 +419,63 @@ export default function InnovationOpsWorkbenchPage() {
     setSel(next)
   }, [pagedTodos, sel])
 
-  function submitMaterialModal() {
+  function openMaterialReview(projectId: string) {
+    const p = projects.find((x) => x.id === projectId)
+    if (!p) return
+    setMaterialModal(p)
+  }
+
+  function openAiEvaluation(projectId: string) {
+    const p = projects.find((x) => x.id === projectId)
+    if (!p) return
+    setAiEvalProject(p)
+  }
+
+  function openAssignExperts(projectId: string) {
+    const p = projects.find((x) => x.id === projectId)
+    if (p) setAssignProject(p)
+  }
+
+  function openDecision(projectId: string) {
+    const p = projects.find((x) => x.id === projectId)
+    if (p) setDecisionProject(p)
+  }
+
+  function openExpertReview(projectId: string) {
+    const p = projects.find((x) => x.id === projectId)
+    if (p) setReviewProject(p)
+  }
+
+  function openTaskAction(row: TodoRow) {
+    switch (row.kind) {
+      case 'material':
+        openMaterialReview(row.projectId)
+        break
+      case 'ai':
+        openAiEvaluation(row.projectId)
+        break
+      case 'assign':
+        openAssignExperts(row.projectId)
+        break
+      case 'decision':
+        openDecision(row.projectId)
+        break
+      case 'expert':
+        openExpertReview(row.projectId)
+        break
+    }
+  }
+
+  function submitMaterialReview(outcome: 'pass' | 'return', comment: string) {
     if (!materialModal) return
-    if (matOutcome === 'pass') {
-      passMaterialReview(materialModal.id, matComment)
-      toast.show('已通过资料审核（演示）', 'success')
+    if (outcome === 'pass') {
+      passMaterialReview(materialModal.id, comment)
+      toast.show('资料审核通过，已进入 AI 评估阶段；已通知项目方（演示站内信）', 'success')
     } else {
-      if (!matComment.trim()) {
-        toast.show('退回时请填写审核意见', 'warning')
-        return
-      }
-      returnMaterialReview(materialModal.id, matComment)
-      toast.show('已退回补充资料', 'success')
+      returnMaterialReview(materialModal.id, comment)
+      toast.show('已退回修改，已通知项目方补充资料（演示站内信）', 'warning')
     }
     setMaterialModal(null)
-    setMatComment('')
-    setMatOutcome('pass')
   }
 
   function runBatchMaterialPass() {
@@ -351,8 +488,14 @@ export default function InnovationOpsWorkbenchPage() {
 
   function runBatchAiTrigger() {
     if (!batchAi) return
-    batchFinalizeAiEval(selectedRows.map((r) => r.projectId))
-    toast.show(`已为 ${selectedRows.length} 个项目生成 AI 初筛报告（演示）`, 'success')
+    const ids = selectedRows.map((r) => r.projectId)
+    if (ids.length === 1) {
+      openAiEvaluation(ids[0]!)
+      setSel({})
+      return
+    }
+    batchFinalizeAiEval(ids)
+    toast.show(`已为 ${ids.length} 个项目生成 AI 初筛报告（演示）`, 'success')
     setSel({})
   }
 
@@ -368,11 +511,24 @@ export default function InnovationOpsWorkbenchPage() {
     toast.show('已发送催办通知给当前处理人（演示）', 'success')
   }
 
-  const checklistPct = useCallback((p: SjProject) => {
-    if (!p.checklist.length) return 0
-    const ok = p.checklist.filter((c) => c.ok).length
-    return Math.round((ok / p.checklist.length) * 100)
-  }, [])
+  function urgeInProgress(row: InProgressRowSeed) {
+    if (!row.canUrge || !row.projectId) {
+      toast.show('已发送催办通知（演示）', 'success')
+      return
+    }
+    const p = projects.find((x) => x.id === row.projectId)
+    if (p?.stage === 'expert_reviewing') {
+      const pend = p.experts.filter((e) => e.state !== 'done')
+      pend.forEach((e) => urgeExpert(p.id, e.expertId))
+      toast.show(`已向 ${pend.length} 位未提交专家发送站内信/邮件催办（演示）`, 'success')
+      return
+    }
+    toast.show('已发送催办通知给当前处理人（演示）', 'success')
+  }
+
+  function cancelInitiated(row: InitiatedRowSeed) {
+    toast.show(`已取消「${row.name}」申请（演示）`, 'success')
+  }
 
   const showRoleHint = role === 'platform' || role === 'enterprise-admin'
 
@@ -382,18 +538,18 @@ export default function InnovationOpsWorkbenchPage() {
         <p className="text-[12px] font-bold uppercase tracking-wide text-primary">科创策源 · 任务中心</p>
         <h1 className="mt-2 text-[20px] font-bold text-foreground">任务中心</h1>
         <p className="mt-2 max-w-3xl text-[13px] leading-relaxed text-muted">
-          统一聚合入孵流程中的待办、已办与发起记录：支持类型筛选、搜索、分页、同类任务批量处理与超时催办（演示数据；生产环境对接各业务表与 WebSocket 推送）。
+          我的待办、进行中、我的已办、我发起的四个视图覆盖任务全生命周期；支持任务类型筛选、搜索、分页与同类批量处理（演示数据）。
         </p>
         {showRoleHint ? (
-          <p className="mt-2 text-[12px] text-muted">当前为园区运营 / 企业管理员视角，展示全量任务类型；专家账号将侧重「项目评审」待办。后续可按 RBAC 裁剪可见任务。</p>
+          <p className="mt-2 text-[12px] text-muted">园区运营视角已加载完整测试数据；专家账号侧重「项目评审」待办。</p>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link to="/innovation/ops/pool" className="text-[13px] font-semibold text-primary hover:underline">
             候选项目池 →
           </Link>
           <span className="text-divider">|</span>
-          <Link to="/innovation/expert/tasks" className="text-[13px] font-semibold text-primary hover:underline">
-            专家任务台 →
+          <Link to="/innovation/ops/ai-hub" className="text-[13px] font-semibold text-primary hover:underline">
+            AI 智能评估 →
           </Link>
         </div>
       </header>
@@ -405,7 +561,7 @@ export default function InnovationOpsWorkbenchPage() {
       </div>
 
       <div className="flex flex-wrap items-center gap-2 rounded-[var(--radius-panel)] border border-divider bg-surface p-2 shadow-sm">
-        {(['todo', 'done', 'initiated'] as const).map((k) => (
+        {(['todo', 'in_progress', 'done', 'initiated'] as const).map((k) => (
           <button
             key={k}
             type="button"
@@ -418,29 +574,53 @@ export default function InnovationOpsWorkbenchPage() {
               tab === k ? 'bg-primary text-white shadow-sm' : 'text-muted hover:bg-page hover:text-foreground',
             )}
           >
-            {k === 'todo' ? '我的待办' : k === 'done' ? '我的已办' : '我发起的'}
-            {k === 'todo' ? `（${todoRows.length}）` : k === 'done' ? `（${doneRows.length}）` : `（${initiatedRows.length}）`}
+            {k === 'todo'
+              ? '我的待办'
+              : k === 'in_progress'
+                ? '进行中'
+                : k === 'done'
+                  ? '我的已办'
+                  : '我发起的'}
+            {k === 'todo'
+              ? `（${todoRows.length}）`
+              : k === 'in_progress'
+                ? `（${inProgressRows.length}）`
+                : k === 'done'
+                  ? `（${doneRows.length}）`
+                  : `（${initiatedRows.length}）`}
           </button>
         ))}
-        <div className="ms-auto flex min-w-[200px] flex-1 flex-wrap items-center justify-end gap-2 sm:min-w-0">
+      </div>
+
+      <div className="rounded-[var(--radius-panel)] border border-divider bg-surface px-4 py-3 shadow-sm">
+        <p className="mb-2 text-[12px] font-semibold text-muted">任务类型快捷筛选</p>
+        <div className="flex flex-wrap items-center gap-2">
+          {TYPE_FILTER_OPTS.map((x) => (
+            <button
+              key={x}
+              type="button"
+              disabled={tab === 'initiated'}
+              onClick={() => setTypeF(x)}
+              className={cn(
+                'rounded-full px-3 py-1.5 text-[12px] font-semibold transition-colors',
+                tab === 'initiated' && 'cursor-not-allowed opacity-40',
+                typeF === x ? 'bg-primary text-white' : 'bg-page text-muted ring-1 ring-divider hover:text-foreground',
+              )}
+            >
+              {x}
+            </button>
+          ))}
+        </div>
+        <div className="mt-3 flex flex-wrap items-center gap-2">
+          <span className="text-muted" aria-hidden>
+            🔍
+          </span>
           <input
             value={q}
             onChange={(e) => setQ(e.target.value)}
             placeholder="搜索任务或项目名称…"
-            className="min-w-0 flex-1 rounded-md border border-divider bg-page px-3 py-2 text-[13px] sm:max-w-xs"
+            className="min-w-0 flex-1 rounded-md border border-divider bg-page px-3 py-2 text-[13px] sm:max-w-md"
           />
-          <label className="flex items-center gap-2 text-[13px] text-muted">
-            类型
-            <select
-              value={typeF}
-              onChange={(e) => setTypeF(e.target.value as (typeof TYPE_FILTER_OPTS)[number])}
-              className="rounded-md border border-divider bg-page px-2 py-2 text-[13px]"
-            >
-              {TYPE_FILTER_OPTS.map((x) => (
-                <option key={x}>{x}</option>
-              ))}
-            </select>
-          </label>
         </div>
       </div>
 
@@ -449,7 +629,7 @@ export default function InnovationOpsWorkbenchPage() {
           <span className="font-semibold text-foreground">已选 {selectedRows.length} 条同类任务</span>
           {batchMaterial ? (
             <button type="button" className="rounded-md bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:bg-primary-hover" onClick={runBatchMaterialPass}>
-              批量资料审核（通过）
+              批量审核
             </button>
           ) : null}
           {batchAi ? (
@@ -508,31 +688,15 @@ export default function InnovationOpsWorkbenchPage() {
                     </span>
                   </td>
                   <td className="px-3 py-3 text-end">
-                    <div className="flex flex-wrap justify-end gap-2">
-                      {row.kind === 'material' ? (
-                        <button
-                          type="button"
-                          className="rounded-md border border-divider px-2 py-1 text-[12px] font-semibold hover:border-primary/40"
-                          onClick={() => {
-                            const p = projects.find((x) => x.id === row.projectId)
-                            if (p) {
-                              setMatOutcome('pass')
-                              setMatComment('')
-                              setMaterialModal(p)
-                            }
-                          }}
-                        >
-                          审核
-                        </button>
-                      ) : null}
-                      <Link to={row.href} className="rounded-md bg-primary px-2 py-1 text-[12px] font-semibold text-white hover:bg-primary-hover">
+                    <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                      <button type="button" className={opLinkPrimary} onClick={() => openTaskAction(row)}>
                         {row.actionLabel}
-                      </Link>
-                      <Link to={`/innovation/project/${row.projectId}`} className="text-[12px] font-semibold text-muted hover:text-primary hover:underline">
-                        查看
+                      </button>
+                      <Link to={`/innovation/project/${row.projectId}`} className={opLinkMuted}>
+                        详情
                       </Link>
                       {row.statusLabel === '超时' ? (
-                        <button type="button" className="text-[12px] font-semibold text-amber-700 hover:underline dark:text-amber-400" onClick={() => urgeTodo(row)}>
+                        <button type="button" className={opLinkUrge} onClick={() => urgeTodo(row)}>
                           催办
                         </button>
                       ) : null}
@@ -544,6 +708,67 @@ export default function InnovationOpsWorkbenchPage() {
           </table>
           {pagedTodos.length === 0 ? <p className="px-4 py-10 text-center text-[13px] text-muted">暂无待办</p> : null}
           <PaginationFooter total={filteredTodos.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />
+        </div>
+      ) : null}
+
+      {tab === 'in_progress' ? (
+        <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-divider bg-surface shadow-sm">
+          <table className="min-w-[920px] w-full border-collapse text-[13px]">
+            <thead className="bg-page text-[11px] font-bold uppercase tracking-wide text-muted">
+              <tr>
+                <th className="px-4 py-3 text-start">任务类型</th>
+                <th className="px-4 py-3 text-start">任务名称 / 项目</th>
+                <th className="px-4 py-3 text-start">创建时间</th>
+                <th className="px-4 py-3 text-start">当前进度</th>
+                <th className="px-4 py-3 text-end">操作</th>
+              </tr>
+            </thead>
+            <tbody className="divide-y divide-divider">
+              {pagedInProgress.map((row) => (
+                <tr key={row.id} className="hover:bg-page/60">
+                  <td className="px-4 py-3 font-medium text-foreground">{row.typeLabel}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground">{row.projectName}</td>
+                  <td className="px-4 py-3 tabular-nums text-muted">{row.createdAt}</td>
+                  <td className="px-4 py-3">
+                    {row.progressPct != null ? (
+                      <div className="flex min-w-[140px] items-center gap-2">
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-page">
+                          <div className="h-full rounded-full bg-primary" style={{ width: `${row.progressPct}%` }} />
+                        </div>
+                        <span className="text-[12px] text-muted">{row.progressLabel}</span>
+                      </div>
+                    ) : (
+                      <span className="text-[12px] text-muted">{row.progressLabel}</span>
+                    )}
+                  </td>
+                  <td className="px-4 py-3 text-end">
+                    <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                      {row.href ? (
+                        <Link to={row.href} className={opLinkPrimary}>
+                          查看进度
+                        </Link>
+                      ) : (
+                        <button
+                          type="button"
+                          className={opLinkPrimary}
+                          onClick={() => toast.show('资源申请详情（演示）', 'info')}
+                        >
+                          查看
+                        </button>
+                      )}
+                      {row.canUrge ? (
+                        <button type="button" className={opLinkUrge} onClick={() => urgeInProgress(row)}>
+                          催办
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+          {pagedInProgress.length === 0 ? <p className="px-4 py-10 text-center text-[13px] text-muted">暂无进行中任务</p> : null}
+          <PaginationFooter total={filteredInProgress.length} page={pageSafe} totalPages={totalPages} onPage={setPage} />
         </div>
       ) : null}
 
@@ -567,9 +792,21 @@ export default function InnovationOpsWorkbenchPage() {
                   <td className="px-4 py-3 text-muted">{row.result}</td>
                   <td className="px-4 py-3 tabular-nums text-muted">{row.at}</td>
                   <td className="px-4 py-3 text-end">
-                    <button type="button" className="text-[12px] font-semibold text-primary hover:underline" onClick={() => setDoneDetail(row)}>
-                      查看详情
-                    </button>
+                    <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                      {row.detailKind === 'report' ? (
+                        <Link to={`/innovation/ops/ai/${row.projectId}`} className={opLinkPrimary}>
+                          查看报告
+                        </Link>
+                      ) : row.detailKind === 'signing' ? (
+                        <Link to={`/hatch/workbench?projectId=${encodeURIComponent(row.projectId)}`} className={opLinkPrimary}>
+                          查看签约
+                        </Link>
+                      ) : (
+                        <button type="button" className={opLinkPrimary} onClick={() => setDoneDetail(row)}>
+                          查看详情
+                        </button>
+                      )}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -582,47 +819,61 @@ export default function InnovationOpsWorkbenchPage() {
 
       {tab === 'initiated' ? (
         <div className="overflow-x-auto rounded-[var(--radius-panel)] border border-divider bg-surface shadow-sm">
-          <p className="border-b border-divider bg-page/80 px-4 py-2 text-[12px] text-muted">演示环境：展示所有 `applicantOwned` 申报项目；生产环境仅当前用户发起记录。</p>
-          <table className="min-w-[800px] w-full border-collapse text-[13px]">
+          <table className="min-w-[880px] w-full border-collapse text-[13px]">
             <thead className="bg-page text-[11px] font-bold uppercase tracking-wide text-muted">
               <tr>
-                <th className="px-4 py-3 text-start">申请项目</th>
-                <th className="px-4 py-3 text-start">提交时间</th>
+                <th className="px-4 py-3 text-start">流程类型</th>
+                <th className="px-4 py-3 text-start">流程名称 / 项目</th>
+                <th className="px-4 py-3 text-start">发起时间</th>
                 <th className="px-4 py-3 text-start">当前节点</th>
                 <th className="px-4 py-3 text-start">状态</th>
                 <th className="px-4 py-3 text-end">操作</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-divider">
-              {pagedInit.map((p) => {
-                const u = applicantStatusFromStage(p)
-                const badge = applicantStatusTone(u)
-                return (
-                  <tr key={p.id} className="hover:bg-page/60">
-                    <td className="px-4 py-3 font-semibold text-foreground">{p.name}</td>
-                    <td className="px-4 py-3 tabular-nums text-muted">{p.submittedAt}</td>
-                    <td className="px-4 py-3 text-muted">{p.currentNodePublic}</td>
-                    <td className="px-4 py-3">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <StatusPill variant={poolStagePillVariant(p)}>{poolStatusLabel(p)}</StatusPill>
-                        <span className={cn('rounded px-2 py-0.5 text-[10px] font-bold', badge.className)}>{badge.label}</span>
-                      </div>
-                    </td>
-                    <td className="px-4 py-3 text-end">
-                      <div className="flex flex-wrap justify-end gap-2">
-                        <Link to={`/innovation/project/${p.id}`} className="text-[12px] font-semibold text-primary hover:underline">
+              {pagedInit.map((row) => (
+                <tr key={row.id} className="hover:bg-page/60">
+                  <td className="px-4 py-3 font-medium text-foreground">{row.flowType}</td>
+                  <td className="px-4 py-3 font-semibold text-foreground">{row.name}</td>
+                  <td className="px-4 py-3 tabular-nums text-muted">{row.createdAt}</td>
+                  <td className="px-4 py-3 text-muted">{row.currentNode}</td>
+                  <td className="px-4 py-3">
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[11px] font-bold',
+                        row.statusTone === 'primary' && 'bg-primary/12 text-primary',
+                        row.statusTone === 'warning' && 'bg-warning/15 text-warning',
+                        row.statusTone === 'muted' && 'bg-muted/30 text-muted',
+                      )}
+                    >
+                      {row.statusLabel}
+                    </span>
+                  </td>
+                  <td className="px-4 py-3 text-end">
+                    <div className="inline-flex flex-wrap items-center justify-end gap-x-3 gap-y-1">
+                      {row.projectId ? (
+                        <Link to={`/innovation/project/${row.projectId}`} className={opLinkPrimary}>
                           查看进度
                         </Link>
-                        {p.stage === 'returned_supplement' ? (
-                          <Link to="/innovation/applicant/register" className="text-[12px] font-semibold text-warning hover:underline">
-                            补充资料
-                          </Link>
-                        ) : null}
-                      </div>
-                    </td>
-                  </tr>
-                )
-              })}
+                      ) : (
+                        <button type="button" className={opLinkPrimary} onClick={() => toast.show('资源申请进度（演示）', 'info')}>
+                          查看进度
+                        </button>
+                      )}
+                      {row.canSupplement ? (
+                        <button type="button" className="text-[12px] font-semibold text-warning hover:underline" onClick={() => toast.show('请补充资料（演示）', 'info')}>
+                          补充资料
+                        </button>
+                      ) : null}
+                      {row.canCancel ? (
+                        <button type="button" className={opLinkMuted} onClick={() => cancelInitiated(row)}>
+                          取消申请
+                        </button>
+                      ) : null}
+                    </div>
+                  </td>
+                </tr>
+              ))}
             </tbody>
           </table>
           {pagedInit.length === 0 ? <p className="px-4 py-10 text-center text-[13px] text-muted">暂无发起记录</p> : null}
@@ -630,54 +881,40 @@ export default function InnovationOpsWorkbenchPage() {
         </div>
       ) : null}
 
-      <Modal
+      <MaterialReviewModal
+        project={materialModal}
         open={materialModal != null}
-        title={materialModal ? `资料审核 · ${materialModal.name}` : ''}
-        onClose={() => {
-          setMaterialModal(null)
-          setMatComment('')
-        }}
-        footer={
-          <>
-            <button type="button" className="rounded-md border border-divider px-4 py-2 text-[13px]" onClick={() => setMaterialModal(null)}>
-              取消
-            </button>
-            <button type="button" className="rounded-md bg-primary px-4 py-2 text-[13px] font-semibold text-white" onClick={submitMaterialModal}>
-              提交
-            </button>
-          </>
-        }
-      >
-        {materialModal ? (
-          <div className="space-y-4 text-[13px]">
-            <p>
-              <span className="text-muted">资料完整性：</span>
-              <span className="font-bold text-primary">{checklistPct(materialModal)}%</span>（按资料清单勾选演示）
-            </p>
-            <label className="block">
-              <span className="text-muted">审核意见</span>
-              <textarea
-                className="mt-1 w-full rounded-md border border-divider bg-page px-3 py-2"
-                rows={3}
-                value={matComment}
-                onChange={(e) => setMatComment(e.target.value)}
-                placeholder="选填；退回时建议说明补充项"
-              />
-            </label>
-            <div className="flex flex-wrap gap-4">
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="radio" checked={matOutcome === 'pass'} onChange={() => setMatOutcome('pass')} />
-                通过
-              </label>
-              <label className="flex cursor-pointer items-center gap-2">
-                <input type="radio" checked={matOutcome === 'return'} onChange={() => setMatOutcome('return')} />
-                退回
-              </label>
-            </div>
-            <p className="text-[12px] text-muted">提交后同步项目阶段；亦可从「审核」进入完整审核页处理附件预览。</p>
-          </div>
-        ) : null}
-      </Modal>
+        onClose={() => setMaterialModal(null)}
+        onSubmit={submitMaterialReview}
+      />
+
+      <AiEvaluationWizardModal
+        project={aiEvalProject}
+        open={aiEvalProject != null}
+        onClose={() => setAiEvalProject(null)}
+        onAssigned={() => setAiEvalProject(null)}
+      />
+
+      <ExpertAssignModal
+        project={assignProject}
+        open={assignProject != null}
+        onClose={() => setAssignProject(null)}
+        onAssigned={() => setAssignProject(null)}
+      />
+
+      <IncubationDecisionModal
+        project={decisionProject}
+        open={decisionProject != null}
+        onClose={() => setDecisionProject(null)}
+        onSubmitted={() => setDecisionProject(null)}
+      />
+
+      <ExpertReviewModal
+        project={reviewProject}
+        open={reviewProject != null}
+        onClose={() => setReviewProject(null)}
+        onSubmitted={() => setReviewProject(null)}
+      />
 
       <Modal open={doneDetail != null} title="任务详情" onClose={() => setDoneDetail(null)}>
         {doneDetail ? (

@@ -8,7 +8,7 @@ type Props = {
   onPageSizeChange?: (n: number) => void
 }
 
-const SIZES = [10, 20, 50, 100] as const
+const SIZES = [12, 10, 20, 50, 100] as const
 
 export function ListPaginationBar({ total, page, pageSize, onPageChange, onPageSizeChange }: Props) {
   const totalPages = Math.max(1, Math.ceil(total / pageSize))

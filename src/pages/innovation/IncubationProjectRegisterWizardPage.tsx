@@ -260,7 +260,6 @@ export default function IncubationProjectRegisterWizardPage() {
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
   const opsProxy = searchParams.get('ops') === '1'
-  const fromPool = searchParams.get('from') === 'pool'
 
   const { projects, registerNewProject } = useInnovationDemo()
   const { archives, createArchiveFromIncubationRegister } = useHatchMgmt()
@@ -454,7 +453,7 @@ export default function IncubationProjectRegisterWizardPage() {
 
     localStorage.removeItem(DRAFT_KEY)
     toast.show(opsProxy ? '已建档：科创策源记录已创建，可前往入孵签约' : '提交成功：已生成入孵档案（待审核）与策源候选项目', 'success')
-    navigate('/innovation/applicant/projects')
+    navigate('/innovation/ops/pool')
   }
 
   function aiRecommend() {
@@ -482,23 +481,18 @@ export default function IncubationProjectRegisterWizardPage() {
     <div className="mx-auto max-w-[min(1180px,calc(100vw-1.5rem))] space-y-5 pb-12">
       <header className="flex flex-wrap items-start justify-between gap-3">
         <div>
-          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">科创策源 · 入孵申请</p>
-          <h1 className="mt-1 text-[20px] font-bold text-foreground">新建项目（入孵申请）</h1>
+          <p className="text-[12px] font-semibold uppercase tracking-wide text-muted">科创策源 · 新增项目</p>
+          <h1 className="mt-1 text-[20px] font-bold text-foreground">新增项目</h1>
           <p className="mt-2 max-w-[720px] text-[13px] text-muted">
-            分步填写项目资料、团队、管线、融资与资源需求；提交后生成<strong>入孵项目档案（待审核）</strong>并同步<strong>策源候选项目</strong>。
+            分步填写主体信息、资料附件、团队/管线/融资与资源需求；提交后同步写入<strong>候选项目池</strong>，并生成入孵项目档案（待审核）。
             {opsProxy ? <span className="ms-1 text-primary">当前为运营代录模式。</span> : null}
           </p>
         </div>
         <div className="text-end text-[12px] text-muted">
           Step {draft.step + 1} / 5
-          <div className="mt-1 flex flex-col items-end gap-1">
-            {fromPool ? (
-              <Link to="/innovation/ops/pool" className="text-primary hover:underline">
-                返回候选项目池
-              </Link>
-            ) : null}
-            <Link to="/innovation/applicant/projects" className="text-primary hover:underline">
-              返回我的项目
+          <div className="mt-1">
+            <Link to="/innovation/ops/pool" className="text-primary hover:underline">
+              返回候选项目池
             </Link>
           </div>
         </div>
