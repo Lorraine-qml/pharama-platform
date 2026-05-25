@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom'
 import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { isPathAllowed } from '../auth/routeAccess'
+import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
 import type { AuthUser } from '../auth/types'
-import { ORG_LABELS, ROLE_LABELS } from '../auth/types'
+import { ORG_LABELS } from '../auth/types'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/ToastProvider'
 import { cn } from '../utils/cn'
@@ -154,7 +155,7 @@ export default function HomePage() {
     [],
   )
 
-  const can = (path: string) => user && isPathAllowed(path, user.role)
+  const can = (path: string) => user && isPathAllowed(path, user)
 
   if (!user) return null
 
@@ -253,7 +254,7 @@ export default function HomePage() {
             <p className="mt-1.5 text-[12px] text-muted">
               空气质量 <span className="font-semibold text-success">优</span>
               <span className="mx-2 text-divider">|</span>
-              角色 <span className="font-semibold text-foreground">{ROLE_LABELS[user.role]}</span>
+              角色 <span className="font-semibold text-foreground">{BUSINESS_ROLE_LABELS[resolveBusinessRole(user)]}</span>
             </p>
           </div>
           <div className="flex flex-wrap items-center gap-3">

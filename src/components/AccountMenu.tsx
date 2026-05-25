@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { isPathAllowed } from '../auth/routeAccess'
-import { ROLE_LABELS, ORG_LABELS } from '../auth/types'
+import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
+import { ORG_LABELS } from '../auth/types'
 import { useToast } from './ToastProvider'
 import { cn } from '../utils/cn'
 
@@ -25,7 +26,7 @@ export function AccountMenu() {
   if (!user) return null
 
   const accountName = ORG_LABELS[user.orgKind]
-  const roleLabel = ROLE_LABELS[user.role]
+  const roleLabel = BUSINESS_ROLE_LABELS[resolveBusinessRole(user)]
   const initials = roleLabel.replace(/（[^）]*）/g, '').slice(0, 2)
 
   function exit() {
@@ -38,7 +39,7 @@ export function AccountMenu() {
     if (!user) return
     const profilePath = '/hatch/archive'
     setOpen(false)
-    if (isPathAllowed(profilePath, user.role)) navigate(profilePath)
+    if (isPathAllowed(profilePath, user)) navigate(profilePath)
     else toast.show('当前角色暂无「个人资料」入口权限（演示）', 'warning')
   }
 
@@ -51,7 +52,7 @@ export function AccountMenu() {
     if (!user) return
     const p = '/system/users'
     setOpen(false)
-    if (isPathAllowed(p, user.role)) navigate(p)
+    if (isPathAllowed(p, user)) navigate(p)
     else toast.show('当前角色暂无「账号管理」权限（演示）', 'warning')
   }
 

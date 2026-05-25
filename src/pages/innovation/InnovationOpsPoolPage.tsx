@@ -1,11 +1,15 @@
 import { Link } from 'react-router-dom'
 import { useMemo, useState } from 'react'
+import { useAuth } from '../../auth/AuthContext'
+import { isPathAllowed } from '../../auth/routeAccess'
+import { isExpertUser } from '../../config/businessRoles'
 import { useToast } from '../../components/ToastProvider'
 import { StatusPill } from '../../components/ui/StatusPill'
 import { downloadCsv } from '../eco/ecoDownload'
 import type { SjProject } from './innovationTypes'
 import { useInnovationDemo } from './InnovationDemoContext'
 import { poolStagePillVariant, poolStatusLabel } from './innovationPoolLabels'
+import { canManagePoolProjects, filterPoolProjectsForUser } from './innovationProjectScope'
 
 const ENTITY_FILTERS = ['全部', '企业', '高校', '研究所', '医院'] as const
 
@@ -32,25 +36,30 @@ function trackOptions(projects: SjProject[]) {
 
 export default function InnovationOpsPoolPage() {
   const toast = useToast()
+  const { user } = useAuth()
   const { projects, batchDeleteProjects } = useInnovationDemo()
+  const scopedProjects = useMemo(() => filterPoolProjectsForUser(projects, user), [projects, user])
+  const canManage = canManagePoolProjects(user)
+  const canCreate = Boolean(user && isPathAllowed('/innovation/applicant/register', user))
+  const readOnly = Boolean(user && isExpertUser(user))
   const [entityF, setEntityF] = useState<string>('全部')
   const [statusF, setStatusF] = useState('全部')
   const [trackF, setTrackF] = useState('全部')
   const [q, setQ] = useState('')
   const [sel, setSel] = useState<Record<string, boolean>>({})
 
-  const statusOpts = useMemo(() => statusFilterOptions(projects), [projects])
-  const trackOpts = useMemo(() => trackOptions(projects), [projects])
+  const statusOpts = useMemo(() => statusFilterOptions(scopedProjects), [scopedProjects])
+  const trackOpts = useMemo(() => trackOptions(scopedProjects), [scopedProjects])
 
   const filtered = useMemo(() => {
-    return projects.filter((p) => {
+    return scopedProjects.filter((p) => {
       if (!entityMatch(entityF, p)) return false
       if (!stageFilterMatch(statusF, p)) return false
       if (trackF !== '全部' && p.track !== trackF) return false
       if (q.trim() && !p.name.includes(q.trim()) && !p.orgFullName.includes(q.trim())) return false
       return true
     })
-  }, [projects, entityF, statusF, trackF, q])
+  }, [scopedProjects, entityF, statusF, trackF, q])
 
   const selectedIds = useMemo(() => Object.keys(sel).filter((id) => sel[id]), [sel])
 
@@ -99,7 +108,7 @@ export default function InnovationOpsPoolPage() {
       return
     }
     const set = new Set(selectedIds)
-    const rows = projects.filter((p) => set.has(p.id)).map((p) => [p.name, p.entityTypeLabel, p.track, poolStatusLabel(p), p.submittedAt])
+    const rows = scopedProjects.filter((p) => set.has(p.id)).map((p) => [p.name, p.entityTypeLabel, p.track, poolStatusLabel(p), p.submittedAt])
     downloadCsv(`候选项目池-已选${selectedIds.length}条-${new Date().toISOString().slice(0, 10)}.csv`, ['项目名称', '主体类型', '赛道', '状态', '提交时间'], rows)
     toast.show(`已导出 ${selectedIds.length} 条（CSV）`, 'success')
   }
@@ -111,23 +120,31 @@ export default function InnovationOpsPoolPage() {
           <p className="text-[12px] font-bold uppercase tracking-wide text-primary">科创策源 · 项目档案库</p>
           <h1 className="mt-1 text-[20px] font-bold text-foreground">候选项目池</h1>
           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
-            仅用于项目档案的查询、新增、编辑与删除；资料审核、AI 评估、专家分配与入孵决策请前往「任务中心」集中处理。
+            {readOnly
+              ? '查看待评审与评审中的入孵项目档案；详细评估请前往「任务中心」。'
+              : canManage
+                ? '仅用于项目档案的查询、新增、编辑与删除；资料审核、AI 评估、专家分配与入孵决策请前往「任务中心」集中处理。'
+                : '仅展示本账号权限下的项目档案；资料审核与入孵进度请前往「任务中心」查看。'}
           </p>
         </div>
         <div className="flex flex-wrap gap-2">
-          <Link
-            to="/innovation/applicant/register?from=pool"
-            className="rounded-[var(--radius-button)] bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm hover:bg-primary-hover"
-          >
-            ＋ 新增项目
-          </Link>
-          <button
-            type="button"
-            className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
-            onClick={() => toast.show('导入 Excel（演示占位）', 'info')}
-          >
-            导入
-          </button>
+          {canCreate ? (
+            <Link
+              to="/innovation/applicant/register?from=pool"
+              className="rounded-[var(--radius-button)] bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm hover:bg-primary-hover"
+            >
+              ＋ 新增项目
+            </Link>
+          ) : null}
+          {canManage ? (
+            <button
+              type="button"
+              className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
+              onClick={() => toast.show('导入 Excel（演示占位）', 'info')}
+            >
+              导入
+            </button>
+          ) : null}
           <button
             type="button"
             className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
@@ -202,14 +219,16 @@ export default function InnovationOpsPoolPage() {
           >
             批量导出所选
           </button>
-          <button
-            type="button"
-            disabled={selectedIds.length === 0}
-            onClick={runBatchDelete}
-            className="rounded-md border border-danger/40 bg-danger/8 px-4 py-2 text-[13px] font-semibold text-danger hover:bg-danger/12 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            批量删除
-          </button>
+          {canManage ? (
+            <button
+              type="button"
+              disabled={selectedIds.length === 0}
+              onClick={runBatchDelete}
+              className="rounded-md border border-danger/40 bg-danger/8 px-4 py-2 text-[13px] font-semibold text-danger hover:bg-danger/12 disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              批量删除
+            </button>
+          ) : null}
         </div>
         <p className="text-[13px] text-muted">
           共 <span className="font-bold text-foreground">{filtered.length}</span> 条
@@ -251,12 +270,16 @@ export default function InnovationOpsPoolPage() {
                     <Link to={`/innovation/project/${p.id}`} className="text-[12px] font-semibold text-primary hover:underline">
                       查看
                     </Link>
-                    <Link to={`/innovation/project/${p.id}?tab=basic`} className="text-[12px] font-semibold text-foreground hover:underline">
-                      编辑
-                    </Link>
-                    <button type="button" className="text-[12px] font-semibold text-danger hover:underline" onClick={() => deleteOne(p)}>
-                      删除
-                    </button>
+                    {!readOnly ? (
+                      <Link to={`/innovation/project/${p.id}?tab=basic`} className="text-[12px] font-semibold text-foreground hover:underline">
+                        编辑
+                      </Link>
+                    ) : null}
+                    {canManage ? (
+                      <button type="button" className="text-[12px] font-semibold text-danger hover:underline" onClick={() => deleteOne(p)}>
+                        删除
+                      </button>
+                    ) : null}
                   </div>
                 </td>
               </tr>

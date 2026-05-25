@@ -1,5 +1,5 @@
-import type { UserRole } from '../auth/types'
-import { allowedPathSet } from '../auth/routeAccess'
+import type { AuthUser } from '../auth/types'
+import { isLeafPathAllowed } from '../auth/routeAccess'
 
 export type NavLeaf = { to: string; label: string }
 
@@ -163,8 +163,7 @@ export const NAV_SECTIONS: NavSection[] = [
 ]
 
 /** 科创策源：子菜单顺序与文案（不含括号备注） */
-export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
-  void _role
+export function sciSourceNavLeaves(): NavLeaf[] {
   return [
     { to: '/innovation/applicant/register', label: '新增项目' },
     { to: '/innovation/ops/workbench', label: '任务中心' },
@@ -176,8 +175,7 @@ export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
 }
 
 /** 资源运营：子菜单顺序与文案（不含括号备注） */
-export function resOpsNavLeaves(_role: UserRole): NavLeaf[] {
-  void _role
+export function resOpsNavLeaves(): NavLeaf[] {
   return [
     { to: '/resops/board', label: '资源看板 V2' },
     { to: '/resops/catalog', label: '资源目录' },
@@ -193,8 +191,7 @@ export function resOpsNavLeaves(_role: UserRole): NavLeaf[] {
 }
 
 /** 孵化评估：仅园区运营 / 企业管理员 */
-export function evalNavLeaves(role: UserRole): NavLeaf[] {
-  if (role !== 'platform' && role !== 'enterprise-admin') return []
+export function evalNavLeaves(): NavLeaf[] {
   return [
     { to: '/eval/portrait', label: 'AI 项目画像' },
     { to: '/eval/growth-tracking', label: '项目成长跟踪' },
@@ -205,26 +202,25 @@ export function evalNavLeaves(role: UserRole): NavLeaf[] {
   ]
 }
 
-function filterNavChild(c: NavChild, allowed: Set<string>): NavChild | null {
+function filterNavChild(c: NavChild, user: AuthUser): NavChild | null {
   if (isNavGroup(c)) {
-    const inner = c.children.filter((leaf) => allowed.has(leaf.to))
+    const inner = c.children.filter((leaf) => isLeafPathAllowed(leaf.to, user))
     return inner.length ? { ...c, children: inner } : null
   }
-  return allowed.has(c.to) ? c : null
+  return isLeafPathAllowed(c.to, user) ? c : null
 }
 
-export function filterNavSections(role: UserRole): NavSection[] {
-  const allowed = allowedPathSet(role)
+export function filterNavSections(user: AuthUser): NavSection[] {
   return NAV_SECTIONS.map((s) => {
     const raw: NavChild[] =
       s.key === 'sci-source'
-        ? sciSourceNavLeaves(role)
+        ? sciSourceNavLeaves()
         : s.key === 'resource-ops'
-          ? resOpsNavLeaves(role)
+          ? resOpsNavLeaves()
           : s.key === 'evaluation'
-            ? evalNavLeaves(role)
+            ? evalNavLeaves()
             : s.children
-    const children = raw.map((c) => filterNavChild(c, allowed)).filter((c): c is NavChild => c != null)
+    const children = raw.map((c) => filterNavChild(c, user)).filter((c): c is NavChild => c != null)
     return { ...s, children }
   }).filter((s) => s.children.length > 0)
 }

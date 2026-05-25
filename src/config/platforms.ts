@@ -1,6 +1,7 @@
-import type { UserRole } from '../auth/types'
+import type { AuthUser } from '../auth/types'
 import type { NavSection } from './navigation'
 import { filterNavSections, firstLeafInSections } from './navigation'
+import { resolveBusinessRole } from './businessRoles'
 
 /** 顶部切换的子平台（下拉顺序：驾驶舱首位，默认路由归属孵化运营平台） */
 export type PlatformId = 'cockpit' | 'incubation' | 'ai' | 'eagle-data'
@@ -46,13 +47,14 @@ export function filterNavForPlatform(sections: NavSection[], platformId: Platfor
   return sections.filter((s) => keys.has(s.key))
 }
 
-export function firstAllowedPathInPlatform(role: UserRole, platformId: PlatformId): string | null {
-  const base = filterNavSections(role)
+export function firstAllowedPathInPlatform(user: AuthUser, platformId: PlatformId): string | null {
+  const base = filterNavSections(user)
   const nav = filterNavForPlatform(base, platformId)
   return firstLeafInSections(nav)?.to ?? null
 }
 
-export function accessiblePlatformIds(_role: UserRole): PlatformId[] {
-  void _role
-  return PLATFORM_OPTIONS.map((p) => p.id)
+export function accessiblePlatformIds(user: AuthUser): PlatformId[] {
+  const br = resolveBusinessRole(user)
+  if (br === 'platform-admin') return PLATFORM_OPTIONS.map((p) => p.id)
+  return ['incubation']
 }

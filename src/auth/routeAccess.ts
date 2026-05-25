@@ -1,108 +1,14 @@
-import type { UserRole } from './types'
+import type { AuthUser, UserRole } from './types'
+import {
+  isMenuLeafAllowed,
+  pathnameAllowedForUser,
+  resolveBusinessRole,
+  type BusinessRoleId,
+} from '../config/businessRoles'
 
-const MODULE_PATHS = [
-  '/innovation/ops/workbench',
-  '/innovation/ops/pool',
-  '/innovation/ops/ai-hub',
-  '/innovation/ops/projects',
-  '/innovation/ops/review',
-  '/innovation/ops/ai',
-  '/innovation/ops/assign',
-  '/innovation/ops/decision',
-  '/innovation/applicant/register',
-  '/innovation/project',
-  '/innovation/expert/review',
-  '/innovation/industry-trends',
-  '/innovation/outreach',
-  /** 旧科创策源 URL，路由层跳转至新工作台 */
-  '/innovation/project-registration',
-  '/innovation/project-materials',
-  '/innovation/ai-evaluation',
-  '/innovation/expert-review',
-  '/innovation/incubation-decision',
-  '/hatch/workbench',
-  '/hatch/physical-space',
-  '/hatch/archive',
-  '/hatch/identity',
-  '/hatch/changes',
-  '/hatch/exit',
-  '/hatch/ai-permissions',
-  '/resops/board',
-  '/resops/ai-match',
-  '/resops/match-analytics',
-  '/resops/mgmt',
-  '/resops/catalog',
-  '/resops/listing-apply',
-  '/resops/listing-audit',
-  '/resops/resource',
-  '/resops/my-applications',
-  '/resops/usage-orders',
-  '/resops/provider',
-  '/eval/portrait',
-  '/eval/growth-tracking',
-  '/eval/growth-score',
-  '/eval/effectiveness',
-  '/eval/risk',
-  '/eval/advice',
-  '/twin/infrastructure',
-  '/twin/infrastructure/parks',
-  '/twin/infrastructure/models',
-  '/twin/infrastructure/buildings',
-  '/twin/infrastructure/spaces',
-  '/twin/distribution/projects',
-  '/twin/distribution/resources',
-  '/twin/space-analytics',
-  '/eco/virtual-project',
-  '/eco/external-partner',
-  '/eco/ai-ability',
-  '/eco/knowledge-base',
-  '/basic/evaluation-forms',
-  '/basic/contracts',
-  '/basic/experts',
-  '/basic/rosters',
-  '/basic/dictionaries',
-  '/basic/resource-types',
-] as const
+const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/platform-modules'] as const
 
-/** 兼容旧书签的入口，在路由层重定向到新模块路径 */
-const LEGACY_PATHS = [
-  '/leads',
-  '/leads/assessment',
-  '/onboarding/space',
-  '/onboarding/profile',
-  '/resources/demo',
-  '/growth',
-  '/digital-twin',
-  '/twin/park-model',
-  '/twin/spaces',
-  '/twin/project-map',
-  '/twin/resource-map',
-  '/twin/virtual-layer',
-  '/twin/analytics',
-  '/admin/roles',
-  '/system/overview',
-  '/system/orgs',
-  '/system/notices',
-] as const
-
-const PLATFORM_PATHS = [
-  '/',
-  '/portal/matchmaking',
-  '/ai-workflow',
-  '/cockpit',
-  '/cockpit/ai-query',
-  '/data/assets',
-  '/data/quality',
-  '/system/users',
-  '/system/roles',
-  '/system/workflows',
-  '/system/audit',
-  '/system/settings',
-] as const
-
-const ALL_PATHS = [...PLATFORM_PATHS, ...MODULE_PATHS, ...LEGACY_PATHS] as const
-
-/** 旧 URL → 重定向目标（用于权限推导：允许旧路径当且仅当用户有权访问新路径） */
+/** 旧 URL → 重定向目标（用于权限推导） */
 const LEGACY_REDIRECT_TARGET: Record<string, string> = {
   '/leads': '/innovation/ops/workbench',
   '/leads/assessment': '/innovation/ai-evaluation',
@@ -121,47 +27,101 @@ const LEGACY_REDIRECT_TARGET: Record<string, string> = {
   '/system/overview': '/system/users',
   '/system/orgs': '/system/users',
   '/system/notices': '/system/settings',
+  '/innovation/project-registration': '/innovation/applicant/register',
+  '/innovation/project-materials': '/innovation/ops/workbench',
+  '/innovation/ai-evaluation': '/innovation/ops/ai-hub',
+  '/innovation/expert-review': '/innovation/ops/workbench',
+  '/innovation/incubation-decision': '/innovation/ops/workbench',
 }
 
-/** 精确路径或以前缀匹配的父路径（pathname 等于 p 或以 p/ 开头） */
-function pathMatches(prefix: string, pathname: string): boolean {
-  return pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`))
+function toAuthUser(userOrRole: AuthUser | UserRole, orgKind?: AuthUser['orgKind']): AuthUser {
+  if (typeof userOrRole !== 'string') return userOrRole
+  return { role: userOrRole, orgKind: orgKind ?? 'physical', displayName: '' }
 }
 
-/**
- * 演示策略：任意登录账号均可访问已注册路由（不按角色裁剪）。
- * 生产环境应恢复为按角色 RBAC 校验。
- */
-function pathKnownToApp(pathname: string): boolean {
-  if (pathname === '/innovation' || pathname === '/hatch' || pathname === '/resops' || pathname === '/basic' || pathname === '/eco' || pathname.startsWith('/eco/')) return true
-  if (ALL_PATHS.some((p) => pathMatches(p, pathname))) return true
-  const mapped = LEGACY_REDIRECT_TARGET[pathname]
-  return mapped ? ALL_PATHS.some((p) => pathMatches(p, mapped)) : false
+function pathnameAllowed(pathname: string, user: AuthUser): boolean {
+  if ((PUBLIC_PATHS as readonly string[]).includes(pathname)) return true
+  const legacyTarget = LEGACY_REDIRECT_TARGET[pathname]
+  if (legacyTarget && pathnameAllowedForUser(legacyTarget, user)) return true
+  return pathnameAllowedForUser(pathname, user)
 }
 
-function isEvalRestrictedPath(pathname: string): boolean {
-  if (pathname === '/eval' || pathname.startsWith('/eval/')) return true
-  const legacy = LEGACY_REDIRECT_TARGET[pathname]
-  return legacy === '/eval' || (typeof legacy === 'string' && legacy.startsWith('/eval/'))
+export function isPathAllowed(pathname: string, userOrRole: AuthUser | UserRole, orgKind?: AuthUser['orgKind']): boolean {
+  return pathnameAllowed(pathname, toAuthUser(userOrRole, orgKind))
 }
 
-export function isPathAllowed(pathname: string, role: UserRole): boolean {
-  if (isEvalRestrictedPath(pathname) && role !== 'platform' && role !== 'enterprise-admin') return false
-  if (pathname === '/twin/space-analytics' || pathname.startsWith('/twin/space-analytics/')) {
-    if (role !== 'platform' && role !== 'enterprise-admin') return false
+/** 侧边栏叶子 path 是否在当前角色权限内 */
+export function isLeafPathAllowed(leafTo: string, user: AuthUser): boolean {
+  return isMenuLeafAllowed(leafTo, user)
+}
+
+/** 侧边栏可用的路径集合（菜单叶子，用于导航过滤） */
+export function allowedPathSet(user: AuthUser): Set<string> {
+  const leaves = new Set<string>()
+  const check = (path: string) => {
+    if (isMenuLeafAllowed(path, user)) leaves.add(path)
   }
-  return pathKnownToApp(pathname)
+  check('/')
+  const allMenuPaths = [
+    '/innovation/applicant/register',
+    '/innovation/ops/workbench',
+    '/innovation/ops/pool',
+    '/innovation/ops/ai-hub',
+    '/innovation/industry-trends',
+    '/innovation/outreach',
+    '/hatch/workbench',
+    '/hatch/archive',
+    '/hatch/physical-space',
+    '/resops/board',
+    '/resops/catalog',
+    '/resops/my-applications',
+    '/resops/usage-orders',
+    '/resops/provider',
+    '/resops/mgmt',
+    '/resops/listing-apply',
+    '/resops/listing-audit',
+    '/resops/ai-match',
+    '/resops/match-analytics',
+    '/eval/portrait',
+    '/eval/growth-tracking',
+    '/eval/growth-score',
+    '/eval/effectiveness',
+    '/eval/risk',
+    '/eval/advice',
+    '/twin/space-analytics',
+    '/twin/infrastructure',
+    '/twin/infrastructure/parks',
+    '/twin/infrastructure/models',
+    '/twin/infrastructure/buildings',
+    '/twin/infrastructure/spaces',
+    '/twin/distribution/projects',
+    '/twin/distribution/resources',
+    '/eco/virtual-project',
+    '/eco/external-partner',
+    '/eco/ai-ability',
+    '/eco/knowledge-base',
+    '/basic/evaluation-forms',
+    '/basic/contracts',
+    '/basic/experts',
+    '/basic/rosters',
+    '/basic/dictionaries',
+    '/basic/resource-types',
+    '/system/users',
+    '/system/roles',
+    '/system/workflows',
+    '/system/audit',
+    '/system/settings',
+    '/portal/matchmaking',
+    '/cockpit',
+    '/cockpit/ai-query',
+    '/ai-workflow',
+    '/data/assets',
+    '/data/quality',
+  ]
+  allMenuPaths.forEach(check)
+  return leaves
 }
 
-/** 侧边栏可用的路径集合（含 /） */
-export function allowedPathSet(role: UserRole): Set<string> {
-  const base = new Set<string>(ALL_PATHS)
-  if (role !== 'platform' && role !== 'enterprise-admin') {
-    base.delete('/twin/space-analytics')
-    for (const p of MODULE_PATHS) {
-      if (p.startsWith('/eval/')) base.delete(p)
-    }
-    base.delete('/growth')
-  }
-  return base
+export function resolveBusinessRoleId(user: AuthUser): BusinessRoleId {
+  return resolveBusinessRole(user)
 }

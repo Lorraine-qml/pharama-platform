@@ -198,7 +198,7 @@ function AppShellInner() {
   const platformSwitcherRef = useRef<HTMLDivElement>(null)
   const noticeRef = useRef<HTMLDivElement>(null)
 
-  const allFiltered = useMemo(() => (user ? filterNavSections(user.role) : []), [user])
+  const allFiltered = useMemo(() => (user ? filterNavSections(user) : []), [user])
   const activePlatformId = platformIdForPath(location.pathname)
   const sections = useMemo(
     () => filterNavForPlatform(allFiltered, activePlatformId),
@@ -208,7 +208,7 @@ function AppShellInner() {
   const activeHit = useMemo(() => resolveNavLeaf(location.pathname, sections), [location.pathname, sections])
 
   const accessibleSet = useMemo(
-    () => new Set<PlatformId>(user ? accessiblePlatformIds(user.role) : []),
+    () => new Set<PlatformId>(user ? accessiblePlatformIds(user) : []),
     [user],
   )
 
@@ -251,14 +251,14 @@ function AppShellInner() {
     return <Navigate to="/login" replace />
   }
 
-  if (!isPathAllowed(location.pathname, user.role)) {
+  if (!isPathAllowed(location.pathname, user)) {
     return <Navigate to="/" replace />
   }
 
   const authUser = user
 
   function switchPlatform(id: PlatformId) {
-    const path = firstAllowedPathInPlatform(authUser.role, id)
+    const path = firstAllowedPathInPlatform(authUser, id)
     if (!path) {
       toast.show('当前账号无权访问该子平台', 'warning')
       return

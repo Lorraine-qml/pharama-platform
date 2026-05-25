@@ -33,7 +33,12 @@ export default function ResopsListingAuditPage() {
   }, [listingApplications, statusF, q])
 
   const counts = useMemo(() => {
-    const c = { pending: 0, approved: 0, rejected: 0 }
+    const c: Record<ResListingApplicationStatus, number> = {
+      pending: 0,
+      approved: 0,
+      rejected: 0,
+      cancelled: 0,
+    }
     listingApplications.forEach((a) => {
       c[a.status] += 1
     })

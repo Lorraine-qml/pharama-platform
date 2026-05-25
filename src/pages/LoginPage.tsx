@@ -3,6 +3,11 @@ import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { AuthSplitLayout } from '../components/AuthSplitLayout'
 import { credentialFor, DEMO_PASSWORD } from '../data/demoAccounts'
+import {
+  BUSINESS_ROLE_LABELS,
+  BUSINESS_ROLE_LOGIN_PRESETS,
+  type BusinessRoleId,
+} from '../config/businessRoles'
 import { ORG_LABELS, ROLE_DESCRIPTIONS, ROLE_LABELS, type OrgKind, type UserRole } from '../auth/types'
 import { cn } from '../utils/cn'
 
@@ -125,7 +130,7 @@ export default function LoginPage() {
         <h2 className="text-center text-[17px] font-semibold text-foreground">欢迎登录</h2>
         <p className="mt-2 text-center text-[13px] text-muted">仅支持账号（用户名或邮箱）与密码登录</p>
         <p className="mt-3 rounded-lg border border-primary/20 bg-primary-light/50 px-3 py-2 text-center text-[12px] leading-relaxed text-foreground">
-          演示环境：任意演示账号登录后均可浏览<strong className="font-semibold">全部功能菜单</strong>；角色仅影响账号展示名称，生产环境需按 RBAC 授权。
+          演示环境：登录后侧栏仅展示<strong className="font-semibold">当前业务角色</strong>对应的功能菜单；可在下方切换「入孵用户 / 服务商 / 平台管理员 / 专家」体验不同权限。
         </p>
         <form onSubmit={onSubmit} className="mt-8 space-y-5">
           <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
@@ -216,6 +221,37 @@ export default function LoginPage() {
             <span className="text-muted">▸</span> 演示环境 · 选择登录身份
           </summary>
           <div className="space-y-5 border-t border-divider px-4 py-4">
+            <section>
+              <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">业务角色（推荐）</h3>
+              <div className="mt-3 grid gap-2 sm:grid-cols-2">
+                {(Object.keys(BUSINESS_ROLE_LABELS) as BusinessRoleId[]).map((id) => {
+                  const preset = BUSINESS_ROLE_LOGIN_PRESETS[id]
+                  const sel = orgKind === preset.orgKind && role === preset.role
+                  return (
+                    <button
+                      key={id}
+                      type="button"
+                      onClick={() => {
+                        setOrgKind(preset.orgKind)
+                        setRole(preset.role)
+                        applyCredential(preset.orgKind, preset.role)
+                      }}
+                      className={cn(
+                        'rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-all',
+                        sel
+                          ? 'border-primary bg-primary-light ring-1 ring-primary/15'
+                          : 'border-divider bg-surface hover:border-primary/35',
+                      )}
+                    >
+                      <span className={cn('text-[13px] font-semibold', sel ? 'text-primary' : 'text-foreground')}>
+                        {BUSINESS_ROLE_LABELS[id]}
+                      </span>
+                      <span className="mt-1 block text-[11px] leading-relaxed text-muted">{preset.hint}</span>
+                    </button>
+                  )
+                })}
+              </div>
+            </section>
             <section>
               <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">企业形态</h3>
               <div className="mt-3 grid gap-2 sm:grid-cols-2">
