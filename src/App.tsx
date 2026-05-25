@@ -72,6 +72,8 @@ import EcoKnowledgeDocsPage from './pages/eco/EcoKnowledgeDocsPage'
 import ResopsV1Shell from './pages/resops/ResopsV1Shell'
 import ResopsMgmtPage from './pages/resops/ResopsMgmtPage'
 import ResopsCatalogBrowsePage from './pages/resops/ResopsCatalogBrowsePage'
+import ResopsListingApplyPage from './pages/resops/ResopsListingApplyPage'
+import ResopsListingAuditPage from './pages/resops/ResopsListingAuditPage'
 import ResopsResourceDetailPage from './pages/resops/ResopsResourceDetailPage'
 import ResopsMyApplicationsPage from './pages/resops/ResopsMyApplicationsPage'
 import ResopsUsageOrdersPage from './pages/resops/ResopsUsageOrdersPage'
@@ -147,6 +149,8 @@ export default function App() {
             <Route path="board" element={<ResopsBoardPage />} />
             <Route path="mgmt" element={<ResopsMgmtPage />} />
             <Route path="catalog" element={<ResopsCatalogBrowsePage />} />
+            <Route path="listing-apply" element={<ResopsListingApplyPage />} />
+            <Route path="listing-audit" element={<ResopsListingAuditPage />} />
             <Route path="resource/:resourceId" element={<ResopsResourceDetailPage />} />
             <Route path="my-applications" element={<ResopsMyApplicationsPage />} />
             <Route path="usage-orders" element={<ResopsUsageOrdersPage />} />

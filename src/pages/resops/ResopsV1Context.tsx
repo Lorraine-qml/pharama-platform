@@ -12,6 +12,8 @@ import type {
   ResUsageOrder,
   ResUsageOrderStatus,
 } from './resopsV1Types'
+import { initialListingApplications } from './resopsListingMock'
+import type { ResListingApplication, SubmitListingApplicationPayload } from './resopsListingTypes'
 import { initialApplications, initialResources, initialUsageOrders } from './resopsV1Mock'
 import { newAuditEvent } from './resopsResourceFlow'
 
@@ -71,6 +73,12 @@ type Ctx = {
   uploadUsageResult: (orderId: string, fileName: string) => void
   completeUsageByApplicant: (orderId: string, stars: number, text: string) => void
   providerNameFilter: string
+  listingApplications: ResListingApplication[]
+  submitListingApplication: (payload: SubmitListingApplicationPayload) => string | null
+  approveListingApplication: (applicationId: string, comment?: string) => void
+  rejectListingApplication: (applicationId: string, comment: string) => void
+  /** 撤销待审核的上架申请（仅提交人，演示） */
+  withdrawListingApplication: (applicationId: string, submitterKey: string) => boolean
 }
 
 const ResCtx = createContext<Ctx | null>(null)
@@ -81,6 +89,7 @@ export function ResopsV1Provider({ children }: { children: ReactNode }) {
   const [resources, setResources] = useState(initialResources)
   const [applications, setApplications] = useState(initialApplications)
   const [usageOrders, setUsageOrders] = useState(initialUsageOrders)
+  const [listingApplications, setListingApplications] = useState(initialListingApplications)
 
   const providerNameFilter = '园区公共实验平台'
 
@@ -345,11 +354,117 @@ export function ResopsV1Provider({ children }: { children: ReactNode }) {
     )
   }, [])
 
+  const submitListingApplication = useCallback(
+    (payload: SubmitListingApplicationPayload) => {
+      const res = resources.find((r) => r.id === payload.resourceId)
+      if (!res || res.status !== 'pending_listing') return null
+      const blocked = listingApplications.some(
+        (a) =>
+          a.resourceId === payload.resourceId &&
+          (a.status === 'pending' || a.status === 'approved'),
+      )
+      if (blocked) return null
+      const id = `la-${Date.now()}`
+      const code = `L2025${String(listingApplications.length + 1).padStart(3, '0')}`
+      const submittedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
+      setListingApplications((prev) => [
+        {
+          id,
+          code,
+          resourceId: payload.resourceId,
+          resourceName: payload.resourceName,
+          reason: payload.reason,
+          attachmentName: payload.attachmentName,
+          submitterKey: payload.submitterKey,
+          submitterLabel: payload.submitterLabel,
+          submittedAt,
+          status: 'pending',
+        },
+        ...prev,
+      ])
+      return id
+    },
+    [resources, listingApplications],
+  )
+
+  const approveListingApplication = useCallback(
+    (applicationId: string, comment?: string) => {
+      const app = listingApplications.find((a) => a.id === applicationId)
+      if (!app || app.status !== 'pending') return
+      const auditedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
+      setListingApplications((prev) =>
+        prev.map((a) =>
+          a.id === applicationId
+            ? {
+                ...a,
+                status: 'approved',
+                auditedBy: DEMO_OPERATOR,
+                auditedAt,
+                auditComment: comment?.trim() || '审核通过',
+              }
+            : a,
+        ),
+      )
+      setResources((prev) =>
+        prev.map((x) => {
+          if (x.id !== app.resourceId || x.status !== 'pending_listing') return x
+          const evt = newAuditEvent({
+            actor: DEMO_OPERATOR,
+            action: 'list',
+            label: '上架',
+            detail: `上架申请 ${app.code} 已通过`,
+          })
+          return pushAudit({ ...x, status: 'listed', availabilityLabel: '空闲中' }, evt)
+        }),
+      )
+    },
+    [listingApplications],
+  )
+
+  const rejectListingApplication = useCallback((applicationId: string, comment: string) => {
+    const auditedAt = new Date().toISOString().slice(0, 16).replace('T', ' ')
+    setListingApplications((prev) =>
+      prev.map((a) =>
+        a.id === applicationId && a.status === 'pending'
+          ? {
+              ...a,
+              status: 'rejected',
+              auditedBy: DEMO_OPERATOR,
+              auditedAt,
+              auditComment: comment.trim() || '已驳回',
+            }
+          : a,
+      ),
+    )
+  }, [])
+
+  const withdrawListingApplication = useCallback((applicationId: string, submitterKey: string) => {
+    let ok = false
+    setListingApplications((prev) =>
+      prev.map((a) => {
+        if (a.id !== applicationId || a.status !== 'pending' || a.submitterKey !== submitterKey) return a
+        ok = true
+        return {
+          ...a,
+          status: 'cancelled' as const,
+          auditedBy: undefined,
+          auditedAt: undefined,
+          auditComment: '用户撤销申请',
+        }
+      }),
+    )
+    return ok
+  }, [])
+
   const value = useMemo(
     (): Ctx => ({
       resources,
       applications,
       usageOrders,
+      listingApplications,
+      submitListingApplication,
+      approveListingApplication,
+      rejectListingApplication,
       registerResource,
       updateResource,
       deleteResource,
@@ -363,11 +478,17 @@ export function ResopsV1Provider({ children }: { children: ReactNode }) {
       uploadUsageResult,
       completeUsageByApplicant,
       providerNameFilter,
+      withdrawListingApplication,
     }),
     [
       resources,
       applications,
       usageOrders,
+      listingApplications,
+      submitListingApplication,
+      approveListingApplication,
+      rejectListingApplication,
+      withdrawListingApplication,
       registerResource,
       updateResource,
       deleteResource,

@@ -1,6 +1,7 @@
 import type { StatusPillVariant } from '../components/ui/StatusPill'
 import type { HatchSignStatus } from '../pages/hatch/hatchTypes'
 import type { HatchProjectStatus } from '../pages/hatch/hatchTypes'
+import type { ResListingApplicationStatus } from '../pages/resops/resopsListingTypes'
 import type { ResApplicationStatus, ResResourceStatus, ResUsageOrderStatus } from '../pages/resops/resopsV1Types'
 
 export function hatchSignPillVariant(status: HatchSignStatus | string): StatusPillVariant {
@@ -70,6 +71,21 @@ export function resApplicationPillVariant(status: ResApplicationStatus): StatusP
     case 'rejected':
     case 'cancelled':
       return 'danger'
+    default:
+      return 'muted'
+  }
+}
+
+export function resListingApplicationPillVariant(status: ResListingApplicationStatus): StatusPillVariant {
+  switch (status) {
+    case 'pending':
+      return 'pending'
+    case 'approved':
+      return 'success'
+    case 'rejected':
+      return 'danger'
+    case 'cancelled':
+      return 'muted'
     default:
       return 'muted'
   }

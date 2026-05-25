@@ -1,4 +1,6 @@
+import type { AuthUser } from '../../auth/types'
 import type { ResApplicationStatus, ResResourceStatus, ResUsageOrderStatus } from './resopsV1Types'
+import type { ResListingApplicationStatus } from './resopsListingTypes'
 import type { UserRole } from '../../auth/types'
 import { DEMO_APPLICANT_KEYS } from './resopsV1Mock'
 
@@ -6,6 +8,23 @@ export function demoApplicantForRole(role: UserRole): { key: string; label: stri
   if (role === 'resource-applicant') return { key: DEMO_APPLICANT_KEYS.aiDrug, label: 'AI 新药筛选平台' }
   if (role === 'enterprise-admin') return { key: DEMO_APPLICANT_KEYS.gene, label: '基因治疗项目' }
   return { key: DEMO_APPLICANT_KEYS.gene, label: '演示项目方' }
+}
+
+/** 资源上架申请提交人（演示：与登录角色绑定，用于「仅看本人申请单」） */
+export function demoListingSubmitterForUser(user: AuthUser): { key: string; label: string } {
+  const base = demoApplicantForRole(user.role)
+  if (user.role === 'platform') {
+    const short = user.displayName.split('·')[0]?.trim() || '园区运营'
+    return { key: 'listing_submitter_ops', label: short }
+  }
+  return { key: `listing_${base.key}`, label: base.label }
+}
+
+export const LISTING_APPLICATION_STATUS_LABEL: Record<ResListingApplicationStatus, string> = {
+  pending: '待审核',
+  approved: '已通过',
+  rejected: '已驳回',
+  cancelled: '已撤销',
 }
 
 export const RESOURCE_STATUS_LABEL: Record<ResResourceStatus, string> = {

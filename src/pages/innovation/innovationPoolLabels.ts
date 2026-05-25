@@ -9,7 +9,7 @@ export function poolStatusLabel(p: SjProject): string {
     case 'returned_supplement':
       return '资料补充'
     case 'pending_ai':
-      return p.aiReport ? 'AI评估完成·待确认' : '待AI评估'
+      return p.aiReport ? 'AI评估完成·待确认' : '待评估'
     case 'pending_expert_assign':
       return '待专家分配'
     case 'expert_reviewing':

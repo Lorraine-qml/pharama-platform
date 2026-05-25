@@ -162,31 +162,33 @@ export const NAV_SECTIONS: NavSection[] = [
   },
 ]
 
-/** 科创策源：演示合并全部入口（括号标注原职责角色，生产环境将按 RBAC 拆分） */
+/** 科创策源：子菜单顺序与文案（不含括号备注） */
 export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
   void _role
   return [
-    { to: '/innovation/ops/workbench', label: '任务中心（园区运营）' },
-    { to: '/innovation/ops/pool', label: '候选项目池（园区运营）' },
-    { to: '/innovation/applicant/register', label: '新增项目（园区运营）' },
-    { to: '/innovation/ops/ai-hub', label: 'AI 智能评估（园区运营）' },
-    { to: '/innovation/industry-trends', label: '行业趋势分析（V2 预留）' },
-    { to: '/innovation/outreach', label: '招商触达辅助（V2 预留）' },
+    { to: '/innovation/applicant/register', label: '新增项目' },
+    { to: '/innovation/ops/workbench', label: '任务中心' },
+    { to: '/innovation/ops/pool', label: '候选项目池' },
+    { to: '/innovation/ops/ai-hub', label: 'AI 智能评估' },
+    { to: '/innovation/industry-trends', label: '行业趋势分析' },
+    { to: '/innovation/outreach', label: '招商触达辅助' },
   ]
 }
 
-/** 资源运营：演示合并全部入口 */
+/** 资源运营：子菜单顺序与文案（不含括号备注） */
 export function resOpsNavLeaves(_role: UserRole): NavLeaf[] {
   void _role
   return [
+    { to: '/resops/board', label: '资源看板 V2' },
     { to: '/resops/catalog', label: '资源目录' },
-    { to: '/resops/my-applications', label: '我的申请（项目方）' },
+    { to: '/resops/my-applications', label: '我的申请' },
     { to: '/resops/usage-orders', label: '资源使用单' },
     { to: '/resops/provider', label: '提供方工作台' },
-    { to: '/resops/board', label: '资源看板 V2（园区运营）' },
-    { to: '/resops/ai-match', label: 'AI 供需撮合 V2（项目方）' },
-    { to: '/resops/match-analytics', label: '撮合效果跟踪 V2（园区运营）' },
-    { to: '/resops/mgmt', label: '资源管理 V2（园区运营）' },
+    { to: '/resops/mgmt', label: '资源管理 V2' },
+    { to: '/resops/listing-apply', label: '资源上架' },
+    { to: '/resops/listing-audit', label: '资源审核' },
+    { to: '/resops/ai-match', label: 'AI 供需撮合 V2' },
+    { to: '/resops/match-analytics', label: '撮合效果跟踪 V2' },
   ]
 }
 
