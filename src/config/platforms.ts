@@ -1,7 +1,6 @@
 import type { AuthUser } from '../auth/types'
 import type { NavSection } from './navigation'
 import { filterNavSections, firstLeafInSections } from './navigation'
-import { resolveBusinessRole } from './businessRoles'
 
 /** 顶部切换的子平台（下拉顺序：驾驶舱首位，默认路由归属孵化运营平台） */
 export type PlatformId = 'cockpit' | 'incubation' | 'ai' | 'eagle-data'
@@ -53,8 +52,6 @@ export function firstAllowedPathInPlatform(user: AuthUser, platformId: PlatformI
   return firstLeafInSections(nav)?.to ?? null
 }
 
-export function accessiblePlatformIds(user: AuthUser): PlatformId[] {
-  const br = resolveBusinessRole(user)
-  if (br === 'platform-admin') return PLATFORM_OPTIONS.map((p) => p.id)
-  return ['incubation']
+export function accessiblePlatformIds(_user: AuthUser): PlatformId[] {
+  return PLATFORM_OPTIONS.map((p) => p.id)
 }

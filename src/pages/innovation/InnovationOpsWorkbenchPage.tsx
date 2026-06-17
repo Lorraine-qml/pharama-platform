@@ -541,7 +541,7 @@ export default function InnovationOpsWorkbenchPage() {
           我的待办、进行中、我的已办、我发起的四个视图覆盖任务全生命周期；支持任务类型筛选、搜索、分页与同类批量处理（演示数据）。
         </p>
         {showRoleHint ? (
-          <p className="mt-2 text-[12px] text-muted">园区运营视角已加载完整测试数据；专家账号侧重「项目评审」待办。</p>
+          <p className="mt-2 text-[12px] text-muted">平台管理员视角已加载完整测试数据。</p>
         ) : null}
         <div className="mt-3 flex flex-wrap gap-2">
           <Link to="/innovation/ops/pool" className="text-[13px] font-semibold text-primary hover:underline">

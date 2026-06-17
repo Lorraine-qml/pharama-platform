@@ -6,7 +6,7 @@ import {
   type BusinessRoleId,
 } from '../config/businessRoles'
 
-const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/platform-modules'] as const
+const PUBLIC_PATHS = ['/', '/register', '/forgot-password', '/platform-modules'] as const
 
 /** 旧 URL → 重定向目标（用于权限推导） */
 const LEGACY_REDIRECT_TARGET: Record<string, string> = {
@@ -61,7 +61,7 @@ export function allowedPathSet(user: AuthUser): Set<string> {
   const check = (path: string) => {
     if (isMenuLeafAllowed(path, user)) leaves.add(path)
   }
-  check('/')
+  check('/console')
   const allMenuPaths = [
     '/innovation/applicant/register',
     '/innovation/ops/workbench',

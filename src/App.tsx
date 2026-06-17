@@ -3,10 +3,10 @@ import RequireAuth from './components/RequireAuth'
 import AppShell from './layouts/AppShell'
 import PublicLayout from './layouts/PublicLayout'
 import HomePage from './pages/HomePage'
-import LoginPage from './pages/LoginPage'
 import RegisterPage from './pages/RegisterPage'
 import ForgotPasswordPage from './pages/ForgotPasswordPage'
 import PlatformModulesPage from './pages/PlatformModulesPage'
+import StrategySourceCockpitPage from './pages/strategyCockpit/StrategySourceCockpitPage'
 import MatchmakingPage from './pages/MatchmakingPage'
 import AiWorkflowPage from './pages/AiWorkflowPage'
 import CockpitPage from './pages/CockpitPage'
@@ -86,15 +86,16 @@ import ResopsMatchAnalyticsPage from './pages/resops/ResopsMatchAnalyticsPage'
 export default function App() {
   return (
     <Routes>
+      <Route index element={<StrategySourceCockpitPage />} />
       <Route path="/platform-modules" element={<PlatformModulesPage />} />
+      <Route path="/login" element={<Navigate to="/" replace />} />
       <Route element={<PublicLayout />}>
-        <Route path="/login" element={<LoginPage />} />
         <Route path="/register" element={<RegisterPage />} />
         <Route path="/forgot-password" element={<ForgotPasswordPage />} />
       </Route>
       <Route element={<RequireAuth />}>
         <Route element={<AppShell />}>
-          <Route index element={<HomePage />} />
+          <Route path="console" element={<HomePage />} />
 
           {/* 科创策源（演示：DemoProvider 仅包裹本前缀） */}
           <Route path="innovation" element={<InnovationSciShell />}>

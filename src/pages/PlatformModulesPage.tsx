@@ -105,7 +105,7 @@ export default function PlatformModulesPage() {
   return (
     <div className="min-h-screen bg-page">
       <header className="border-b border-divider bg-surface px-6 py-8 shadow-sm sm:px-10">
-        <Link to="/login" className="text-[13px] font-medium text-primary hover:underline">
+        <Link to="/console" className="text-[13px] font-medium text-primary hover:underline">
           ← 返回登录
         </Link>
         <h1 className="mt-6 text-[24px] font-semibold tracking-tight text-foreground">核心功能模块 · 界面示意与说明</h1>

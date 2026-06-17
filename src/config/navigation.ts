@@ -35,7 +35,7 @@ export const NAV_SECTIONS: NavSection[] = [
     key: 'dashboard',
     label: '仪表盘',
     icon: '📊',
-    children: [{ to: '/', label: '工作台' }],
+    children: [{ to: '/console', label: '工作台' }],
   },
   {
     key: 'sci-source',
@@ -277,12 +277,12 @@ export function getRouteMeta(pathname: string, sections: NavSection[]) {
   const hit = resolveNavLeaf(pathname, sections)
   if (!hit) {
     return {
-      breadcrumbs: [{ label: '首页', to: '/' }] as { label: string; to?: string }[],
+      breadcrumbs: [{ label: '首页', to: '/console' }] as { label: string; to?: string }[],
       title: '页面',
     }
   }
   const breadcrumbs: { label: string; to?: string }[] = [
-    { label: '首页', to: '/' },
+    { label: '首页', to: '/console' },
     { label: hit.section.label },
     ...(hit.group ? [{ label: hit.group.label }] : []),
     { label: hit.leaf.label },

@@ -2,25 +2,7 @@ import { Link, Navigate, useLocation, useNavigate } from 'react-router-dom'
 import { useState, type FormEvent } from 'react'
 import { useAuth } from '../auth/AuthContext'
 import { AuthSplitLayout } from '../components/AuthSplitLayout'
-import { credentialFor, DEMO_PASSWORD } from '../data/demoAccounts'
-import {
-  BUSINESS_ROLE_LABELS,
-  BUSINESS_ROLE_LOGIN_PRESETS,
-  type BusinessRoleId,
-} from '../config/businessRoles'
-import { ORG_LABELS, ROLE_DESCRIPTIONS, ROLE_LABELS, type OrgKind, type UserRole } from '../auth/types'
-import { cn } from '../utils/cn'
-
-const LOGIN_ROLES: UserRole[] = [
-  'platform',
-  'enterprise-admin',
-  'expert',
-  'rd',
-  'finance',
-  'resource-applicant',
-  'member',
-  'collaborator',
-]
+import { DEMO_PASSWORD, PLATFORM_ADMIN_CREDENTIAL } from '../data/demoAccounts'
 
 const LAST_ACCOUNT_KEY = 'pharma-login-remember-account'
 
@@ -57,44 +39,21 @@ export default function LoginPage() {
   const location = useLocation()
   const from = (location.state as { from?: string } | undefined)?.from ?? '/'
 
-  const [orgKind, setOrgKind] = useState<OrgKind>('physical')
-  const [role, setRole] = useState<UserRole>('enterprise-admin')
   const [username, setUsername] = useState(
-    () => localStorage.getItem(LAST_ACCOUNT_KEY) ?? credentialFor('physical', 'enterprise-admin').username,
+    () => localStorage.getItem(LAST_ACCOUNT_KEY) ?? PLATFORM_ADMIN_CREDENTIAL.username,
   )
   const [password, setPassword] = useState(DEMO_PASSWORD)
   const [error, setError] = useState<string | null>(null)
   const [remember, setRemember] = useState(true)
   const [submitting, setSubmitting] = useState(false)
 
-  function applyCredential(nextOrg: OrgKind, nextRole: UserRole) {
-    const c = credentialFor(nextOrg, nextRole)
-    setUsername(c.username)
-    setPassword(c.password)
-    setError(null)
-  }
-
-  function selectOrg(id: OrgKind) {
-    setOrgKind(id)
-    applyCredential(id, role)
-  }
-
-  function selectRole(r: UserRole) {
-    setRole(r)
-    applyCredential(orgKind, r)
-  }
-
   if (user) {
     return <Navigate to="/" replace />
   }
 
-  function applyCurrentCredential() {
-    applyCredential(orgKind, role)
-  }
-
   async function onSubmit(e: FormEvent) {
     e.preventDefault()
-    const expected = credentialFor(orgKind, role)
+    const expected = PLATFORM_ADMIN_CREDENTIAL
     const u = username.trim()
     if (u !== expected.username || password !== expected.password) {
       setError('账号或密码错误，请检查后重试。')
@@ -113,8 +72,6 @@ export default function LoginPage() {
     }
   }
 
-  const expectedCred = credentialFor(orgKind, role)
-
   return (
     <AuthSplitLayout
       footer={
@@ -128,9 +85,9 @@ export default function LoginPage() {
     >
       <div className="rounded-[var(--radius-panel)] border border-divider bg-surface px-8 py-10 shadow-[0_24px_80px_-28px_rgb(30_109_255/0.28)]">
         <h2 className="text-center text-[17px] font-semibold text-foreground">欢迎登录</h2>
-        <p className="mt-2 text-center text-[13px] text-muted">仅支持账号（用户名或邮箱）与密码登录</p>
+        <p className="mt-2 text-center text-[13px] text-muted">平台管理员账号登录</p>
         <p className="mt-3 rounded-lg border border-primary/20 bg-primary-light/50 px-3 py-2 text-center text-[12px] leading-relaxed text-foreground">
-          演示环境：登录后侧栏仅展示<strong className="font-semibold">当前业务角色</strong>对应的功能菜单；可在下方切换「入孵用户 / 服务商 / 平台管理员 / 专家」体验不同权限。
+          本平台仅供<strong className="font-semibold">平台管理员</strong>使用，登录后可访问全部运营功能菜单。
         </p>
         <form onSubmit={onSubmit} className="mt-8 space-y-5">
           <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
@@ -209,112 +166,16 @@ export default function LoginPage() {
           </button>
         </form>
 
-        <p className="mt-6 text-center text-[13px] text-muted">
-          没有账号？
-          <Link to="/register" className="ml-1 font-medium text-primary hover:underline">
-            立即注册
-          </Link>
-        </p>
-
         <details className="mt-6 rounded-[var(--radius-card)] border border-divider bg-page">
           <summary className="cursor-pointer list-none px-4 py-3 text-[13px] font-medium text-foreground outline-none [&::-webkit-details-marker]:hidden">
-            <span className="text-muted">▸</span> 演示环境 · 选择登录身份
+            <span className="text-muted">▸</span> 演示环境 · 平台管理员账号
           </summary>
-          <div className="space-y-5 border-t border-divider px-4 py-4">
-            <section>
-              <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">业务角色（推荐）</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {(Object.keys(BUSINESS_ROLE_LABELS) as BusinessRoleId[]).map((id) => {
-                  const preset = BUSINESS_ROLE_LOGIN_PRESETS[id]
-                  const sel = orgKind === preset.orgKind && role === preset.role
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => {
-                        setOrgKind(preset.orgKind)
-                        setRole(preset.role)
-                        applyCredential(preset.orgKind, preset.role)
-                      }}
-                      className={cn(
-                        'rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-all',
-                        sel
-                          ? 'border-primary bg-primary-light ring-1 ring-primary/15'
-                          : 'border-divider bg-surface hover:border-primary/35',
-                      )}
-                    >
-                      <span className={cn('text-[13px] font-semibold', sel ? 'text-primary' : 'text-foreground')}>
-                        {BUSINESS_ROLE_LABELS[id]}
-                      </span>
-                      <span className="mt-1 block text-[11px] leading-relaxed text-muted">{preset.hint}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-            <section>
-              <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">企业形态</h3>
-              <div className="mt-3 grid gap-2 sm:grid-cols-2">
-                {(Object.entries(ORG_LABELS) as [OrgKind, string][]).map(([id, label]) => {
-                  const sel = orgKind === id
-                  return (
-                    <button
-                      key={id}
-                      type="button"
-                      onClick={() => selectOrg(id)}
-                      className={cn(
-                        'rounded-[var(--radius-card)] border px-3 py-2.5 text-left text-[13px] transition-all',
-                        sel
-                          ? 'border-primary bg-primary-light font-semibold text-primary ring-1 ring-primary/15'
-                          : 'border-divider bg-surface hover:border-primary/35',
-                      )}
-                    >
-                      {label}
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-            <section>
-              <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">登录角色</h3>
-              <div className="mt-3 max-h-[220px] space-y-2 overflow-y-auto pr-1">
-                {LOGIN_ROLES.map((r) => {
-                  const sel = role === r
-                  return (
-                    <button
-                      key={r}
-                      type="button"
-                      onClick={() => selectRole(r)}
-                      className={cn(
-                        'flex w-full flex-col rounded-[var(--radius-card)] border px-4 py-2.5 text-left transition-all',
-                        sel
-                          ? 'border-primary bg-primary-light ring-1 ring-primary/15'
-                          : 'border-divider bg-surface hover:border-primary/35',
-                      )}
-                    >
-                      <span className={cn('text-[13px] font-semibold', sel ? 'text-primary' : 'text-foreground')}>
-                        {ROLE_LABELS[r]}
-                      </span>
-                      <span className="mt-1 text-[11px] leading-relaxed text-muted">{ROLE_DESCRIPTIONS[r]}</span>
-                    </button>
-                  )
-                })}
-              </div>
-            </section>
-            <div className="flex flex-wrap items-center gap-3 border-t border-divider pt-4">
-              <button
-                type="button"
-                onClick={applyCurrentCredential}
-                className="rounded-[var(--radius-button)] border border-divider bg-surface px-3 py-2 text-[12px] font-medium hover:border-primary hover:text-primary"
-              >
-                填入当前演示账号
-              </button>
-              <span className="text-[11px] text-muted">
-                演示口令 <span className="font-mono font-semibold text-primary">{DEMO_PASSWORD}</span>
-              </span>
-            </div>
-            <p className="text-[11px] text-muted">
-              当前匹配账号 <span className="font-mono font-medium text-primary">{expectedCred.username}</span>
+          <div className="space-y-3 border-t border-divider px-4 py-4 text-[12px] text-muted">
+            <p>
+              演示账号 <span className="font-mono font-medium text-primary">{PLATFORM_ADMIN_CREDENTIAL.username}</span>
+            </p>
+            <p>
+              演示口令 <span className="font-mono font-semibold text-primary">{DEMO_PASSWORD}</span>
             </p>
           </div>
         </details>

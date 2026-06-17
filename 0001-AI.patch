@@ -1,0 +1,902 @@
+From e26b95455753a88a3b03f481414b464485af51b8 Mon Sep 17 00:00:00 2001
+From: =?UTF-8?q?=E5=91=A8=E9=AB=98=E5=86=B7?= <1600750340@QQ.COM>
+Date: Mon, 25 May 2026 14:21:12 +0800
+Subject: [PATCH] =?UTF-8?q?=E5=BE=85AI=E8=AF=84=E4=BC=B0=E6=94=B9=E4=B8=BA?=
+ =?UTF-8?q?=E5=BE=85=E8=AF=84=E4=BC=B0=EF=BC=8C=E4=BF=AE=E6=94=B9=E8=8F=9C?=
+ =?UTF-8?q?=E5=8D=95=E9=A1=BA=E5=BA=8F=EF=BC=8C=E5=8C=BA=E5=88=86=E7=99=BB?=
+ =?UTF-8?q?=E5=BD=95=E4=B8=8D=E5=90=8C=E8=A7=92=E8=89=B2=E6=89=80=E8=A7=81?=
+ =?UTF-8?q?=E8=8F=9C=E5=8D=95?=
+MIME-Version: 1.0
+Content-Type: text/plain; charset=UTF-8
+Content-Transfer-Encoding: 8bit
+
+---
+ src/auth/routeAccess.ts                       | 230 ++++++++----------
+ src/components/AccountMenu.tsx                |   9 +-
+ src/config/businessRoles.ts                   | 122 ++++++++++
+ src/config/navigation.ts                      |  30 +--
+ src/config/platforms.ts                       |  14 +-
+ src/layouts/AppShell.tsx                      |   8 +-
+ src/pages/HomePage.tsx                        |   7 +-
+ src/pages/LoginPage.tsx                       |  38 ++-
+ .../innovation/InnovationOpsPoolPage.tsx      |  89 ++++---
+ .../innovation/innovationProjectScope.ts      |  19 ++
+ src/pages/resops/ResopsListingAuditPage.tsx   |   7 +-
+ 11 files changed, 369 insertions(+), 204 deletions(-)
+ create mode 100644 src/config/businessRoles.ts
+ create mode 100644 src/pages/innovation/innovationProjectScope.ts
+
+diff --git a/src/auth/routeAccess.ts b/src/auth/routeAccess.ts
+index 5973aed..fc7fdd5 100644
+--- a/src/auth/routeAccess.ts
++++ b/src/auth/routeAccess.ts
+@@ -1,108 +1,14 @@
+-import type { UserRole } from './types'
++import type { AuthUser, UserRole } from './types'
++import {
++  isMenuLeafAllowed,
++  pathnameAllowedForUser,
++  resolveBusinessRole,
++  type BusinessRoleId,
++} from '../config/businessRoles'
+ 
+-const MODULE_PATHS = [
+-  '/innovation/ops/workbench',
+-  '/innovation/ops/pool',
+-  '/innovation/ops/ai-hub',
+-  '/innovation/ops/projects',
+-  '/innovation/ops/review',
+-  '/innovation/ops/ai',
+-  '/innovation/ops/assign',
+-  '/innovation/ops/decision',
+-  '/innovation/applicant/register',
+-  '/innovation/project',
+-  '/innovation/expert/review',
+-  '/innovation/industry-trends',
+-  '/innovation/outreach',
+-  /** 旧科创策源 URL，路由层跳转至新工作台 */
+-  '/innovation/project-registration',
+-  '/innovation/project-materials',
+-  '/innovation/ai-evaluation',
+-  '/innovation/expert-review',
+-  '/innovation/incubation-decision',
+-  '/hatch/workbench',
+-  '/hatch/physical-space',
+-  '/hatch/archive',
+-  '/hatch/identity',
+-  '/hatch/changes',
+-  '/hatch/exit',
+-  '/hatch/ai-permissions',
+-  '/resops/board',
+-  '/resops/ai-match',
+-  '/resops/match-analytics',
+-  '/resops/mgmt',
+-  '/resops/catalog',
+-  '/resops/listing-apply',
+-  '/resops/listing-audit',
+-  '/resops/resource',
+-  '/resops/my-applications',
+-  '/resops/usage-orders',
+-  '/resops/provider',
+-  '/eval/portrait',
+-  '/eval/growth-tracking',
+-  '/eval/growth-score',
+-  '/eval/effectiveness',
+-  '/eval/risk',
+-  '/eval/advice',
+-  '/twin/infrastructure',
+-  '/twin/infrastructure/parks',
+-  '/twin/infrastructure/models',
+-  '/twin/infrastructure/buildings',
+-  '/twin/infrastructure/spaces',
+-  '/twin/distribution/projects',
+-  '/twin/distribution/resources',
+-  '/twin/space-analytics',
+-  '/eco/virtual-project',
+-  '/eco/external-partner',
+-  '/eco/ai-ability',
+-  '/eco/knowledge-base',
+-  '/basic/evaluation-forms',
+-  '/basic/contracts',
+-  '/basic/experts',
+-  '/basic/rosters',
+-  '/basic/dictionaries',
+-  '/basic/resource-types',
+-] as const
++const PUBLIC_PATHS = ['/login', '/register', '/forgot-password', '/platform-modules'] as const
+ 
+-/** 兼容旧书签的入口，在路由层重定向到新模块路径 */
+-const LEGACY_PATHS = [
+-  '/leads',
+-  '/leads/assessment',
+-  '/onboarding/space',
+-  '/onboarding/profile',
+-  '/resources/demo',
+-  '/growth',
+-  '/digital-twin',
+-  '/twin/park-model',
+-  '/twin/spaces',
+-  '/twin/project-map',
+-  '/twin/resource-map',
+-  '/twin/virtual-layer',
+-  '/twin/analytics',
+-  '/admin/roles',
+-  '/system/overview',
+-  '/system/orgs',
+-  '/system/notices',
+-] as const
+-
+-const PLATFORM_PATHS = [
+-  '/',
+-  '/portal/matchmaking',
+-  '/ai-workflow',
+-  '/cockpit',
+-  '/cockpit/ai-query',
+-  '/data/assets',
+-  '/data/quality',
+-  '/system/users',
+-  '/system/roles',
+-  '/system/workflows',
+-  '/system/audit',
+-  '/system/settings',
+-] as const
+-
+-const ALL_PATHS = [...PLATFORM_PATHS, ...MODULE_PATHS, ...LEGACY_PATHS] as const
+-
+-/** 旧 URL → 重定向目标（用于权限推导：允许旧路径当且仅当用户有权访问新路径） */
++/** 旧 URL → 重定向目标（用于权限推导） */
+ const LEGACY_REDIRECT_TARGET: Record<string, string> = {
+   '/leads': '/innovation/ops/workbench',
+   '/leads/assessment': '/innovation/ai-evaluation',
+@@ -121,47 +27,101 @@ const LEGACY_REDIRECT_TARGET: Record<string, string> = {
+   '/system/overview': '/system/users',
+   '/system/orgs': '/system/users',
+   '/system/notices': '/system/settings',
++  '/innovation/project-registration': '/innovation/applicant/register',
++  '/innovation/project-materials': '/innovation/ops/workbench',
++  '/innovation/ai-evaluation': '/innovation/ops/ai-hub',
++  '/innovation/expert-review': '/innovation/ops/workbench',
++  '/innovation/incubation-decision': '/innovation/ops/workbench',
+ }
+ 
+-/** 精确路径或以前缀匹配的父路径（pathname 等于 p 或以 p/ 开头） */
+-function pathMatches(prefix: string, pathname: string): boolean {
+-  return pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`))
++function toAuthUser(userOrRole: AuthUser | UserRole, orgKind?: AuthUser['orgKind']): AuthUser {
++  if (typeof userOrRole !== 'string') return userOrRole
++  return { role: userOrRole, orgKind: orgKind ?? 'physical', displayName: '' }
+ }
+ 
+-/**
+- * 演示策略：任意登录账号均可访问已注册路由（不按角色裁剪）。
+- * 生产环境应恢复为按角色 RBAC 校验。
+- */
+-function pathKnownToApp(pathname: string): boolean {
+-  if (pathname === '/innovation' || pathname === '/hatch' || pathname === '/resops' || pathname === '/basic' || pathname === '/eco' || pathname.startsWith('/eco/')) return true
+-  if (ALL_PATHS.some((p) => pathMatches(p, pathname))) return true
+-  const mapped = LEGACY_REDIRECT_TARGET[pathname]
+-  return mapped ? ALL_PATHS.some((p) => pathMatches(p, mapped)) : false
++function pathnameAllowed(pathname: string, user: AuthUser): boolean {
++  if ((PUBLIC_PATHS as readonly string[]).includes(pathname)) return true
++  const legacyTarget = LEGACY_REDIRECT_TARGET[pathname]
++  if (legacyTarget && pathnameAllowedForUser(legacyTarget, user)) return true
++  return pathnameAllowedForUser(pathname, user)
+ }
+ 
+-function isEvalRestrictedPath(pathname: string): boolean {
+-  if (pathname === '/eval' || pathname.startsWith('/eval/')) return true
+-  const legacy = LEGACY_REDIRECT_TARGET[pathname]
+-  return legacy === '/eval' || (typeof legacy === 'string' && legacy.startsWith('/eval/'))
++export function isPathAllowed(pathname: string, userOrRole: AuthUser | UserRole, orgKind?: AuthUser['orgKind']): boolean {
++  return pathnameAllowed(pathname, toAuthUser(userOrRole, orgKind))
+ }
+ 
+-export function isPathAllowed(pathname: string, role: UserRole): boolean {
+-  if (isEvalRestrictedPath(pathname) && role !== 'platform' && role !== 'enterprise-admin') return false
+-  if (pathname === '/twin/space-analytics' || pathname.startsWith('/twin/space-analytics/')) {
+-    if (role !== 'platform' && role !== 'enterprise-admin') return false
+-  }
+-  return pathKnownToApp(pathname)
++/** 侧边栏叶子 path 是否在当前角色权限内 */
++export function isLeafPathAllowed(leafTo: string, user: AuthUser): boolean {
++  return isMenuLeafAllowed(leafTo, user)
+ }
+ 
+-/** 侧边栏可用的路径集合（含 /） */
+-export function allowedPathSet(role: UserRole): Set<string> {
+-  const base = new Set<string>(ALL_PATHS)
+-  if (role !== 'platform' && role !== 'enterprise-admin') {
+-    base.delete('/twin/space-analytics')
+-    for (const p of MODULE_PATHS) {
+-      if (p.startsWith('/eval/')) base.delete(p)
+-    }
+-    base.delete('/growth')
++/** 侧边栏可用的路径集合（菜单叶子，用于导航过滤） */
++export function allowedPathSet(user: AuthUser): Set<string> {
++  const leaves = new Set<string>()
++  const check = (path: string) => {
++    if (isMenuLeafAllowed(path, user)) leaves.add(path)
+   }
+-  return base
++  check('/')
++  const allMenuPaths = [
++    '/innovation/applicant/register',
++    '/innovation/ops/workbench',
++    '/innovation/ops/pool',
++    '/innovation/ops/ai-hub',
++    '/innovation/industry-trends',
++    '/innovation/outreach',
++    '/hatch/workbench',
++    '/hatch/archive',
++    '/hatch/physical-space',
++    '/resops/board',
++    '/resops/catalog',
++    '/resops/my-applications',
++    '/resops/usage-orders',
++    '/resops/provider',
++    '/resops/mgmt',
++    '/resops/listing-apply',
++    '/resops/listing-audit',
++    '/resops/ai-match',
++    '/resops/match-analytics',
++    '/eval/portrait',
++    '/eval/growth-tracking',
++    '/eval/growth-score',
++    '/eval/effectiveness',
++    '/eval/risk',
++    '/eval/advice',
++    '/twin/space-analytics',
++    '/twin/infrastructure',
++    '/twin/infrastructure/parks',
++    '/twin/infrastructure/models',
++    '/twin/infrastructure/buildings',
++    '/twin/infrastructure/spaces',
++    '/twin/distribution/projects',
++    '/twin/distribution/resources',
++    '/eco/virtual-project',
++    '/eco/external-partner',
++    '/eco/ai-ability',
++    '/eco/knowledge-base',
++    '/basic/evaluation-forms',
++    '/basic/contracts',
++    '/basic/experts',
++    '/basic/rosters',
++    '/basic/dictionaries',
++    '/basic/resource-types',
++    '/system/users',
++    '/system/roles',
++    '/system/workflows',
++    '/system/audit',
++    '/system/settings',
++    '/portal/matchmaking',
++    '/cockpit',
++    '/cockpit/ai-query',
++    '/ai-workflow',
++    '/data/assets',
++    '/data/quality',
++  ]
++  allMenuPaths.forEach(check)
++  return leaves
++}
++
++export function resolveBusinessRoleId(user: AuthUser): BusinessRoleId {
++  return resolveBusinessRole(user)
+ }
+diff --git a/src/components/AccountMenu.tsx b/src/components/AccountMenu.tsx
+index 3e0eb2c..7fabfab 100644
+--- a/src/components/AccountMenu.tsx
++++ b/src/components/AccountMenu.tsx
+@@ -2,7 +2,8 @@ import { useEffect, useRef, useState } from 'react'
+ import { useNavigate } from 'react-router-dom'
+ import { useAuth } from '../auth/AuthContext'
+ import { isPathAllowed } from '../auth/routeAccess'
+-import { ROLE_LABELS, ORG_LABELS } from '../auth/types'
++import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
++import { ORG_LABELS } from '../auth/types'
+ import { useToast } from './ToastProvider'
+ import { cn } from '../utils/cn'
+ 
+@@ -25,7 +26,7 @@ export function AccountMenu() {
+   if (!user) return null
+ 
+   const accountName = ORG_LABELS[user.orgKind]
+-  const roleLabel = ROLE_LABELS[user.role]
++  const roleLabel = BUSINESS_ROLE_LABELS[resolveBusinessRole(user)]
+   const initials = roleLabel.replace(/（[^）]*）/g, '').slice(0, 2)
+ 
+   function exit() {
+@@ -38,7 +39,7 @@ export function AccountMenu() {
+     if (!user) return
+     const profilePath = '/hatch/archive'
+     setOpen(false)
+-    if (isPathAllowed(profilePath, user.role)) navigate(profilePath)
++    if (isPathAllowed(profilePath, user)) navigate(profilePath)
+     else toast.show('当前角色暂无「个人资料」入口权限（演示）', 'warning')
+   }
+ 
+@@ -51,7 +52,7 @@ export function AccountMenu() {
+     if (!user) return
+     const p = '/system/users'
+     setOpen(false)
+-    if (isPathAllowed(p, user.role)) navigate(p)
++    if (isPathAllowed(p, user)) navigate(p)
+     else toast.show('当前角色暂无「账号管理」权限（演示）', 'warning')
+   }
+ 
+diff --git a/src/config/businessRoles.ts b/src/config/businessRoles.ts
+new file mode 100644
+index 0000000..7182af3
+--- /dev/null
++++ b/src/config/businessRoles.ts
+@@ -0,0 +1,122 @@
++import type { AuthUser } from '../auth/types'
++
++/** 生物芯片孵化平台 · 四类业务角色 */
++export type BusinessRoleId = 'incubation-user' | 'service-provider' | 'platform-admin' | 'expert'
++
++export const BUSINESS_ROLE_LABELS: Record<BusinessRoleId, string> = {
++  'incubation-user': '入孵用户',
++  'service-provider': '服务商',
++  'platform-admin': '平台管理员',
++  expert: '专家',
++}
++
++/** 路由访问前缀（含动态子路径，如 /innovation/project/:id） */
++export const BUSINESS_ROLE_PATH_PREFIXES: Record<BusinessRoleId, readonly string[]> = {
++  'incubation-user': [
++    '/',
++    '/innovation/applicant/register',
++    '/innovation/ops/workbench',
++    '/innovation/ops/pool',
++    '/innovation/project',
++    '/hatch/archive',
++    '/hatch/workbench',
++    '/resops/catalog',
++    '/resops/my-applications',
++    '/resops/usage-orders',
++    '/resops/listing-apply',
++    '/resops/ai-match',
++    '/resops/resource',
++  ],
++  'service-provider': [
++    '/',
++    '/resops/provider',
++    '/resops/mgmt',
++    '/resops/listing-apply',
++    '/resops/usage-orders',
++    '/resops/catalog',
++    '/resops/resource',
++  ],
++  'platform-admin': [
++    '/',
++    '/innovation',
++    '/hatch',
++    '/resops',
++    '/eval',
++    '/twin',
++    '/eco',
++    '/basic',
++    '/system',
++    '/portal/matchmaking',
++    '/cockpit',
++    '/ai-workflow',
++    '/data',
++  ],
++  expert: [
++    '/',
++    '/innovation/ops/workbench',
++    '/innovation/ops/pool',
++    '/innovation/ops/review',
++    '/innovation/expert/review',
++    '/innovation/project',
++  ],
++}
++
++export function resolveBusinessRole(user: AuthUser): BusinessRoleId {
++  if (user.role === 'expert') return 'expert'
++  if (user.role === 'platform') return 'platform-admin'
++  if (user.orgKind === 'service-provider') return 'service-provider'
++  return 'incubation-user'
++}
++
++/** 登录演示：业务角色 → 推荐的企业形态与系统角色 */
++export const BUSINESS_ROLE_LOGIN_PRESETS: Record<
++  BusinessRoleId,
++  { orgKind: AuthUser['orgKind']; role: AuthUser['role']; hint: string }
++> = {
++  'incubation-user': {
++    orgKind: 'physical',
++    role: 'enterprise-admin',
++    hint: '入孵注册、候选项目池（仅本账号项目）、入孵运营工作台与资源预约',
++  },
++  'service-provider': {
++    orgKind: 'service-provider',
++    role: 'enterprise-admin',
++    hint: '资源登记、提供方工作台与使用单查看',
++  },
++  'platform-admin': {
++    orgKind: 'physical',
++    role: 'platform',
++    hint: '入孵/服务商审核、资源与系统全量管理',
++  },
++  expert: {
++    orgKind: 'physical',
++    role: 'expert',
++    hint: '入孵企业材料评审、任务中心与项目查阅',
++  },
++}
++
++export function pathMatchesPrefix(prefix: string, pathname: string): boolean {
++  return pathname === prefix || (prefix !== '/' && pathname.startsWith(`${prefix}/`))
++}
++
++export function pathnameAllowedForUser(pathname: string, user: AuthUser): boolean {
++  const prefixes = BUSINESS_ROLE_PATH_PREFIXES[resolveBusinessRole(user)]
++  return prefixes.some((p) => pathMatchesPrefix(p, pathname))
++}
++
++/** 侧栏叶子菜单是否对当前角色可见 */
++export function isMenuLeafAllowed(leafTo: string, user: AuthUser): boolean {
++  return pathnameAllowedForUser(leafTo, user)
++}
++
++export function canViewAllPoolProjects(user: AuthUser): boolean {
++  return resolveBusinessRole(user) === 'platform-admin'
++}
++
++export function isIncubationPoolUser(user: AuthUser): boolean {
++  return resolveBusinessRole(user) === 'incubation-user'
++}
++
++export function isExpertUser(user: AuthUser): boolean {
++  return resolveBusinessRole(user) === 'expert'
++}
+diff --git a/src/config/navigation.ts b/src/config/navigation.ts
+index 65c68e2..35b8f13 100644
+--- a/src/config/navigation.ts
++++ b/src/config/navigation.ts
+@@ -1,5 +1,5 @@
+-import type { UserRole } from '../auth/types'
+-import { allowedPathSet } from '../auth/routeAccess'
++import type { AuthUser } from '../auth/types'
++import { isLeafPathAllowed } from '../auth/routeAccess'
+ 
+ export type NavLeaf = { to: string; label: string }
+ 
+@@ -163,8 +163,7 @@ export const NAV_SECTIONS: NavSection[] = [
+ ]
+ 
+ /** 科创策源：子菜单顺序与文案（不含括号备注） */
+-export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
+-  void _role
++export function sciSourceNavLeaves(): NavLeaf[] {
+   return [
+     { to: '/innovation/applicant/register', label: '新增项目' },
+     { to: '/innovation/ops/workbench', label: '任务中心' },
+@@ -176,8 +175,7 @@ export function sciSourceNavLeaves(_role: UserRole): NavLeaf[] {
+ }
+ 
+ /** 资源运营：子菜单顺序与文案（不含括号备注） */
+-export function resOpsNavLeaves(_role: UserRole): NavLeaf[] {
+-  void _role
++export function resOpsNavLeaves(): NavLeaf[] {
+   return [
+     { to: '/resops/board', label: '资源看板 V2' },
+     { to: '/resops/catalog', label: '资源目录' },
+@@ -193,8 +191,7 @@ export function resOpsNavLeaves(_role: UserRole): NavLeaf[] {
+ }
+ 
+ /** 孵化评估：仅园区运营 / 企业管理员 */
+-export function evalNavLeaves(role: UserRole): NavLeaf[] {
+-  if (role !== 'platform' && role !== 'enterprise-admin') return []
++export function evalNavLeaves(): NavLeaf[] {
+   return [
+     { to: '/eval/portrait', label: 'AI 项目画像' },
+     { to: '/eval/growth-tracking', label: '项目成长跟踪' },
+@@ -205,26 +202,25 @@ export function evalNavLeaves(role: UserRole): NavLeaf[] {
+   ]
+ }
+ 
+-function filterNavChild(c: NavChild, allowed: Set<string>): NavChild | null {
++function filterNavChild(c: NavChild, user: AuthUser): NavChild | null {
+   if (isNavGroup(c)) {
+-    const inner = c.children.filter((leaf) => allowed.has(leaf.to))
++    const inner = c.children.filter((leaf) => isLeafPathAllowed(leaf.to, user))
+     return inner.length ? { ...c, children: inner } : null
+   }
+-  return allowed.has(c.to) ? c : null
++  return isLeafPathAllowed(c.to, user) ? c : null
+ }
+ 
+-export function filterNavSections(role: UserRole): NavSection[] {
+-  const allowed = allowedPathSet(role)
++export function filterNavSections(user: AuthUser): NavSection[] {
+   return NAV_SECTIONS.map((s) => {
+     const raw: NavChild[] =
+       s.key === 'sci-source'
+-        ? sciSourceNavLeaves(role)
++        ? sciSourceNavLeaves()
+         : s.key === 'resource-ops'
+-          ? resOpsNavLeaves(role)
++          ? resOpsNavLeaves()
+           : s.key === 'evaluation'
+-            ? evalNavLeaves(role)
++            ? evalNavLeaves()
+             : s.children
+-    const children = raw.map((c) => filterNavChild(c, allowed)).filter((c): c is NavChild => c != null)
++    const children = raw.map((c) => filterNavChild(c, user)).filter((c): c is NavChild => c != null)
+     return { ...s, children }
+   }).filter((s) => s.children.length > 0)
+ }
+diff --git a/src/config/platforms.ts b/src/config/platforms.ts
+index d8336c6..3457715 100644
+--- a/src/config/platforms.ts
++++ b/src/config/platforms.ts
+@@ -1,6 +1,7 @@
+-import type { UserRole } from '../auth/types'
++import type { AuthUser } from '../auth/types'
+ import type { NavSection } from './navigation'
+ import { filterNavSections, firstLeafInSections } from './navigation'
++import { resolveBusinessRole } from './businessRoles'
+ 
+ /** 顶部切换的子平台（下拉顺序：驾驶舱首位，默认路由归属孵化运营平台） */
+ export type PlatformId = 'cockpit' | 'incubation' | 'ai' | 'eagle-data'
+@@ -46,13 +47,14 @@ export function filterNavForPlatform(sections: NavSection[], platformId: Platfor
+   return sections.filter((s) => keys.has(s.key))
+ }
+ 
+-export function firstAllowedPathInPlatform(role: UserRole, platformId: PlatformId): string | null {
+-  const base = filterNavSections(role)
++export function firstAllowedPathInPlatform(user: AuthUser, platformId: PlatformId): string | null {
++  const base = filterNavSections(user)
+   const nav = filterNavForPlatform(base, platformId)
+   return firstLeafInSections(nav)?.to ?? null
+ }
+ 
+-export function accessiblePlatformIds(_role: UserRole): PlatformId[] {
+-  void _role
+-  return PLATFORM_OPTIONS.map((p) => p.id)
++export function accessiblePlatformIds(user: AuthUser): PlatformId[] {
++  const br = resolveBusinessRole(user)
++  if (br === 'platform-admin') return PLATFORM_OPTIONS.map((p) => p.id)
++  return ['incubation']
+ }
+diff --git a/src/layouts/AppShell.tsx b/src/layouts/AppShell.tsx
+index 88ccc4d..84ceebf 100644
+--- a/src/layouts/AppShell.tsx
++++ b/src/layouts/AppShell.tsx
+@@ -198,7 +198,7 @@ function AppShellInner() {
+   const platformSwitcherRef = useRef<HTMLDivElement>(null)
+   const noticeRef = useRef<HTMLDivElement>(null)
+ 
+-  const allFiltered = useMemo(() => (user ? filterNavSections(user.role) : []), [user])
++  const allFiltered = useMemo(() => (user ? filterNavSections(user) : []), [user])
+   const activePlatformId = platformIdForPath(location.pathname)
+   const sections = useMemo(
+     () => filterNavForPlatform(allFiltered, activePlatformId),
+@@ -208,7 +208,7 @@ function AppShellInner() {
+   const activeHit = useMemo(() => resolveNavLeaf(location.pathname, sections), [location.pathname, sections])
+ 
+   const accessibleSet = useMemo(
+-    () => new Set<PlatformId>(user ? accessiblePlatformIds(user.role) : []),
++    () => new Set<PlatformId>(user ? accessiblePlatformIds(user) : []),
+     [user],
+   )
+ 
+@@ -251,14 +251,14 @@ function AppShellInner() {
+     return <Navigate to="/login" replace />
+   }
+ 
+-  if (!isPathAllowed(location.pathname, user.role)) {
++  if (!isPathAllowed(location.pathname, user)) {
+     return <Navigate to="/" replace />
+   }
+ 
+   const authUser = user
+ 
+   function switchPlatform(id: PlatformId) {
+-    const path = firstAllowedPathInPlatform(authUser.role, id)
++    const path = firstAllowedPathInPlatform(authUser, id)
+     if (!path) {
+       toast.show('当前账号无权访问该子平台', 'warning')
+       return
+diff --git a/src/pages/HomePage.tsx b/src/pages/HomePage.tsx
+index e816505..2eb234f 100644
+--- a/src/pages/HomePage.tsx
++++ b/src/pages/HomePage.tsx
+@@ -2,8 +2,9 @@ import { Link } from 'react-router-dom'
+ import { useCallback, useEffect, useId, useMemo, useState, type ReactNode } from 'react'
+ import { useAuth } from '../auth/AuthContext'
+ import { isPathAllowed } from '../auth/routeAccess'
++import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
+ import type { AuthUser } from '../auth/types'
+-import { ORG_LABELS, ROLE_LABELS } from '../auth/types'
++import { ORG_LABELS } from '../auth/types'
+ import { Modal } from '../components/Modal'
+ import { useToast } from '../components/ToastProvider'
+ import { cn } from '../utils/cn'
+@@ -154,7 +155,7 @@ export default function HomePage() {
+     [],
+   )
+ 
+-  const can = (path: string) => user && isPathAllowed(path, user.role)
++  const can = (path: string) => user && isPathAllowed(path, user)
+ 
+   if (!user) return null
+ 
+@@ -253,7 +254,7 @@ export default function HomePage() {
+             <p className="mt-1.5 text-[12px] text-muted">
+               空气质量 <span className="font-semibold text-success">优</span>
+               <span className="mx-2 text-divider">|</span>
+-              角色 <span className="font-semibold text-foreground">{ROLE_LABELS[user.role]}</span>
++              角色 <span className="font-semibold text-foreground">{BUSINESS_ROLE_LABELS[resolveBusinessRole(user)]}</span>
+             </p>
+           </div>
+           <div className="flex flex-wrap items-center gap-3">
+diff --git a/src/pages/LoginPage.tsx b/src/pages/LoginPage.tsx
+index 4ca5580..e4d052c 100644
+--- a/src/pages/LoginPage.tsx
++++ b/src/pages/LoginPage.tsx
+@@ -3,6 +3,11 @@ import { useState, type FormEvent } from 'react'
+ import { useAuth } from '../auth/AuthContext'
+ import { AuthSplitLayout } from '../components/AuthSplitLayout'
+ import { credentialFor, DEMO_PASSWORD } from '../data/demoAccounts'
++import {
++  BUSINESS_ROLE_LABELS,
++  BUSINESS_ROLE_LOGIN_PRESETS,
++  type BusinessRoleId,
++} from '../config/businessRoles'
+ import { ORG_LABELS, ROLE_DESCRIPTIONS, ROLE_LABELS, type OrgKind, type UserRole } from '../auth/types'
+ import { cn } from '../utils/cn'
+ 
+@@ -125,7 +130,7 @@ export default function LoginPage() {
+         <h2 className="text-center text-[17px] font-semibold text-foreground">欢迎登录</h2>
+         <p className="mt-2 text-center text-[13px] text-muted">仅支持账号（用户名或邮箱）与密码登录</p>
+         <p className="mt-3 rounded-lg border border-primary/20 bg-primary-light/50 px-3 py-2 text-center text-[12px] leading-relaxed text-foreground">
+-          演示环境：任意演示账号登录后均可浏览<strong className="font-semibold">全部功能菜单</strong>；角色仅影响账号展示名称，生产环境需按 RBAC 授权。
++          演示环境：登录后侧栏仅展示<strong className="font-semibold">当前业务角色</strong>对应的功能菜单；可在下方切换「入孵用户 / 服务商 / 平台管理员 / 专家」体验不同权限。
+         </p>
+         <form onSubmit={onSubmit} className="mt-8 space-y-5">
+           <div className="flex flex-wrap items-center gap-3 sm:flex-nowrap">
+@@ -216,6 +221,37 @@ export default function LoginPage() {
+             <span className="text-muted">▸</span> 演示环境 · 选择登录身份
+           </summary>
+           <div className="space-y-5 border-t border-divider px-4 py-4">
++            <section>
++              <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">业务角色（推荐）</h3>
++              <div className="mt-3 grid gap-2 sm:grid-cols-2">
++                {(Object.keys(BUSINESS_ROLE_LABELS) as BusinessRoleId[]).map((id) => {
++                  const preset = BUSINESS_ROLE_LOGIN_PRESETS[id]
++                  const sel = orgKind === preset.orgKind && role === preset.role
++                  return (
++                    <button
++                      key={id}
++                      type="button"
++                      onClick={() => {
++                        setOrgKind(preset.orgKind)
++                        setRole(preset.role)
++                        applyCredential(preset.orgKind, preset.role)
++                      }}
++                      className={cn(
++                        'rounded-[var(--radius-card)] border px-3 py-2.5 text-left transition-all',
++                        sel
++                          ? 'border-primary bg-primary-light ring-1 ring-primary/15'
++                          : 'border-divider bg-surface hover:border-primary/35',
++                      )}
++                    >
++                      <span className={cn('text-[13px] font-semibold', sel ? 'text-primary' : 'text-foreground')}>
++                        {BUSINESS_ROLE_LABELS[id]}
++                      </span>
++                      <span className="mt-1 block text-[11px] leading-relaxed text-muted">{preset.hint}</span>
++                    </button>
++                  )
++                })}
++              </div>
++            </section>
+             <section>
+               <h3 className="text-[12px] font-semibold uppercase tracking-wider text-muted">企业形态</h3>
+               <div className="mt-3 grid gap-2 sm:grid-cols-2">
+diff --git a/src/pages/innovation/InnovationOpsPoolPage.tsx b/src/pages/innovation/InnovationOpsPoolPage.tsx
+index 444b9e6..3721497 100644
+--- a/src/pages/innovation/InnovationOpsPoolPage.tsx
++++ b/src/pages/innovation/InnovationOpsPoolPage.tsx
+@@ -1,11 +1,15 @@
+ import { Link } from 'react-router-dom'
+ import { useMemo, useState } from 'react'
++import { useAuth } from '../../auth/AuthContext'
++import { isPathAllowed } from '../../auth/routeAccess'
++import { isExpertUser } from '../../config/businessRoles'
+ import { useToast } from '../../components/ToastProvider'
+ import { StatusPill } from '../../components/ui/StatusPill'
+ import { downloadCsv } from '../eco/ecoDownload'
+ import type { SjProject } from './innovationTypes'
+ import { useInnovationDemo } from './InnovationDemoContext'
+ import { poolStagePillVariant, poolStatusLabel } from './innovationPoolLabels'
++import { canManagePoolProjects, filterPoolProjectsForUser } from './innovationProjectScope'
+ 
+ const ENTITY_FILTERS = ['全部', '企业', '高校', '研究所', '医院'] as const
+ 
+@@ -32,25 +36,30 @@ function trackOptions(projects: SjProject[]) {
+ 
+ export default function InnovationOpsPoolPage() {
+   const toast = useToast()
++  const { user } = useAuth()
+   const { projects, batchDeleteProjects } = useInnovationDemo()
++  const scopedProjects = useMemo(() => filterPoolProjectsForUser(projects, user), [projects, user])
++  const canManage = canManagePoolProjects(user)
++  const canCreate = Boolean(user && isPathAllowed('/innovation/applicant/register', user))
++  const readOnly = Boolean(user && isExpertUser(user))
+   const [entityF, setEntityF] = useState<string>('全部')
+   const [statusF, setStatusF] = useState('全部')
+   const [trackF, setTrackF] = useState('全部')
+   const [q, setQ] = useState('')
+   const [sel, setSel] = useState<Record<string, boolean>>({})
+ 
+-  const statusOpts = useMemo(() => statusFilterOptions(projects), [projects])
+-  const trackOpts = useMemo(() => trackOptions(projects), [projects])
++  const statusOpts = useMemo(() => statusFilterOptions(scopedProjects), [scopedProjects])
++  const trackOpts = useMemo(() => trackOptions(scopedProjects), [scopedProjects])
+ 
+   const filtered = useMemo(() => {
+-    return projects.filter((p) => {
++    return scopedProjects.filter((p) => {
+       if (!entityMatch(entityF, p)) return false
+       if (!stageFilterMatch(statusF, p)) return false
+       if (trackF !== '全部' && p.track !== trackF) return false
+       if (q.trim() && !p.name.includes(q.trim()) && !p.orgFullName.includes(q.trim())) return false
+       return true
+     })
+-  }, [projects, entityF, statusF, trackF, q])
++  }, [scopedProjects, entityF, statusF, trackF, q])
+ 
+   const selectedIds = useMemo(() => Object.keys(sel).filter((id) => sel[id]), [sel])
+ 
+@@ -99,7 +108,7 @@ export default function InnovationOpsPoolPage() {
+       return
+     }
+     const set = new Set(selectedIds)
+-    const rows = projects.filter((p) => set.has(p.id)).map((p) => [p.name, p.entityTypeLabel, p.track, poolStatusLabel(p), p.submittedAt])
++    const rows = scopedProjects.filter((p) => set.has(p.id)).map((p) => [p.name, p.entityTypeLabel, p.track, poolStatusLabel(p), p.submittedAt])
+     downloadCsv(`候选项目池-已选${selectedIds.length}条-${new Date().toISOString().slice(0, 10)}.csv`, ['项目名称', '主体类型', '赛道', '状态', '提交时间'], rows)
+     toast.show(`已导出 ${selectedIds.length} 条（CSV）`, 'success')
+   }
+@@ -111,23 +120,31 @@ export default function InnovationOpsPoolPage() {
+           <p className="text-[12px] font-bold uppercase tracking-wide text-primary">科创策源 · 项目档案库</p>
+           <h1 className="mt-1 text-[20px] font-bold text-foreground">候选项目池</h1>
+           <p className="mt-2 max-w-2xl text-[13px] leading-relaxed text-muted">
+-            仅用于项目档案的查询、新增、编辑与删除；资料审核、AI 评估、专家分配与入孵决策请前往「任务中心」集中处理。
++            {readOnly
++              ? '查看待评审与评审中的入孵项目档案；详细评估请前往「任务中心」。'
++              : canManage
++                ? '仅用于项目档案的查询、新增、编辑与删除；资料审核、AI 评估、专家分配与入孵决策请前往「任务中心」集中处理。'
++                : '仅展示本账号权限下的项目档案；资料审核与入孵进度请前往「任务中心」查看。'}
+           </p>
+         </div>
+         <div className="flex flex-wrap gap-2">
+-          <Link
+-            to="/innovation/applicant/register?from=pool"
+-            className="rounded-[var(--radius-button)] bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm hover:bg-primary-hover"
+-          >
+-            ＋ 新增项目
+-          </Link>
+-          <button
+-            type="button"
+-            className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
+-            onClick={() => toast.show('导入 Excel（演示占位）', 'info')}
+-          >
+-            导入
+-          </button>
++          {canCreate ? (
++            <Link
++              to="/innovation/applicant/register?from=pool"
++              className="rounded-[var(--radius-button)] bg-primary px-4 py-2.5 text-[13px] font-semibold text-white shadow-sm hover:bg-primary-hover"
++            >
++              ＋ 新增项目
++            </Link>
++          ) : null}
++          {canManage ? (
++            <button
++              type="button"
++              className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
++              onClick={() => toast.show('导入 Excel（演示占位）', 'info')}
++            >
++              导入
++            </button>
++          ) : null}
+           <button
+             type="button"
+             className="rounded-[var(--radius-button)] border border-divider bg-surface px-4 py-2.5 text-[13px] font-semibold text-foreground hover:border-primary/40"
+@@ -202,14 +219,16 @@ export default function InnovationOpsPoolPage() {
+           >
+             批量导出所选
+           </button>
+-          <button
+-            type="button"
+-            disabled={selectedIds.length === 0}
+-            onClick={runBatchDelete}
+-            className="rounded-md border border-danger/40 bg-danger/8 px-4 py-2 text-[13px] font-semibold text-danger hover:bg-danger/12 disabled:cursor-not-allowed disabled:opacity-40"
+-          >
+-            批量删除
+-          </button>
++          {canManage ? (
++            <button
++              type="button"
++              disabled={selectedIds.length === 0}
++              onClick={runBatchDelete}
++              className="rounded-md border border-danger/40 bg-danger/8 px-4 py-2 text-[13px] font-semibold text-danger hover:bg-danger/12 disabled:cursor-not-allowed disabled:opacity-40"
++            >
++              批量删除
++            </button>
++          ) : null}
+         </div>
+         <p className="text-[13px] text-muted">
+           共 <span className="font-bold text-foreground">{filtered.length}</span> 条
+@@ -251,12 +270,16 @@ export default function InnovationOpsPoolPage() {
+                     <Link to={`/innovation/project/${p.id}`} className="text-[12px] font-semibold text-primary hover:underline">
+                       查看
+                     </Link>
+-                    <Link to={`/innovation/project/${p.id}?tab=basic`} className="text-[12px] font-semibold text-foreground hover:underline">
+-                      编辑
+-                    </Link>
+-                    <button type="button" className="text-[12px] font-semibold text-danger hover:underline" onClick={() => deleteOne(p)}>
+-                      删除
+-                    </button>
++                    {!readOnly ? (
++                      <Link to={`/innovation/project/${p.id}?tab=basic`} className="text-[12px] font-semibold text-foreground hover:underline">
++                        编辑
++                      </Link>
++                    ) : null}
++                    {canManage ? (
++                      <button type="button" className="text-[12px] font-semibold text-danger hover:underline" onClick={() => deleteOne(p)}>
++                        删除
++                      </button>
++                    ) : null}
+                   </div>
+                 </td>
+               </tr>
+diff --git a/src/pages/innovation/innovationProjectScope.ts b/src/pages/innovation/innovationProjectScope.ts
+new file mode 100644
+index 0000000..d5db141
+--- /dev/null
++++ b/src/pages/innovation/innovationProjectScope.ts
+@@ -0,0 +1,19 @@
++import type { AuthUser } from '../../auth/types'
++import { canViewAllPoolProjects, isExpertUser, isIncubationPoolUser } from '../../config/businessRoles'
++import type { SjProject } from './innovationTypes'
++
++/** 候选项目池：按登录业务角色过滤可见项目 */
++export function filterPoolProjectsForUser(projects: SjProject[], user: AuthUser | null): SjProject[] {
++  if (!user || canViewAllPoolProjects(user)) return projects
++  if (isIncubationPoolUser(user)) return projects.filter((p) => p.applicantOwned)
++  if (isExpertUser(user)) {
++    return projects.filter((p) =>
++      ['pending_expert_assign', 'expert_reviewing', 'review_done', 'pending_decision', 'pending_ai'].includes(p.stage),
++    )
++  }
++  return projects
++}
++
++export function canManagePoolProjects(user: AuthUser | null): boolean {
++  return Boolean(user && canViewAllPoolProjects(user))
++}
+diff --git a/src/pages/resops/ResopsListingAuditPage.tsx b/src/pages/resops/ResopsListingAuditPage.tsx
+index 0311a81..c88bb6f 100644
+--- a/src/pages/resops/ResopsListingAuditPage.tsx
++++ b/src/pages/resops/ResopsListingAuditPage.tsx
+@@ -33,7 +33,12 @@ export default function ResopsListingAuditPage() {
+   }, [listingApplications, statusF, q])
+ 
+   const counts = useMemo(() => {
+-    const c = { pending: 0, approved: 0, rejected: 0 }
++    const c: Record<ResListingApplicationStatus, number> = {
++      pending: 0,
++      approved: 0,
++      rejected: 0,
++      cancelled: 0,
++    }
+     listingApplications.forEach((a) => {
+       c[a.status] += 1
+     })
+-- 
+2.53.0.windows.3
+

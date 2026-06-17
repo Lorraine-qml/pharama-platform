@@ -21,7 +21,7 @@ const roleSlug: Record<UserRole, string> = {
   expert: 'expert',
 }
 
-/** 与左侧「企业形态 + 角色」一一对应的演示账号（共 28 组），口令均为 {@link DEMO_PASSWORD} */
+/** 与「企业形态 + 角色」一一对应的演示账号，口令均为 {@link DEMO_PASSWORD} */
 export function credentialFor(
   orgKind: OrgKind,
   role: UserRole,
@@ -33,3 +33,6 @@ export function credentialFor(
     role,
   }
 }
+
+/** 平台管理员演示账号（唯一登录身份） */
+export const PLATFORM_ADMIN_CREDENTIAL = credentialFor('physical', 'platform')

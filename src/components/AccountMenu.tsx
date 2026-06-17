@@ -3,7 +3,6 @@ import { useNavigate } from 'react-router-dom'
 import { useAuth } from '../auth/AuthContext'
 import { isPathAllowed } from '../auth/routeAccess'
 import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
-import { ORG_LABELS } from '../auth/types'
 import { useToast } from './ToastProvider'
 import { cn } from '../utils/cn'
 
@@ -25,14 +24,14 @@ export function AccountMenu() {
 
   if (!user) return null
 
-  const accountName = ORG_LABELS[user.orgKind]
+  const accountName = '平台管理员'
   const roleLabel = BUSINESS_ROLE_LABELS[resolveBusinessRole(user)]
-  const initials = roleLabel.replace(/（[^）]*）/g, '').slice(0, 2)
+  const initials = '管理'
 
   function exit() {
     logout()
     setOpen(false)
-    navigate('/login', { replace: true })
+    navigate('/', { replace: true })
   }
 
   function profile() {

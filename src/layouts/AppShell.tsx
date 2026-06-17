@@ -248,11 +248,11 @@ function AppShellInner() {
   }, [platformMenuOpen, noticeOpen])
 
   if (!user) {
-    return <Navigate to="/login" replace />
+    return <Navigate to="/" replace />
   }
 
   if (!isPathAllowed(location.pathname, user)) {
-    return <Navigate to="/" replace />
+    return <Navigate to="/console" replace />
   }
 
   const authUser = user

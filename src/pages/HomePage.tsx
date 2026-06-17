@@ -4,7 +4,6 @@ import { useAuth } from '../auth/AuthContext'
 import { isPathAllowed } from '../auth/routeAccess'
 import { BUSINESS_ROLE_LABELS, resolveBusinessRole } from '../config/businessRoles'
 import type { AuthUser } from '../auth/types'
-import { ORG_LABELS } from '../auth/types'
 import { Modal } from '../components/Modal'
 import { useToast } from '../components/ToastProvider'
 import { cn } from '../utils/cn'
@@ -26,12 +25,8 @@ const FUNNEL_STAGES = [
 
 const TREND_POINTS = [42, 48, 45, 52, 58, 61, 67]
 
-function workbenchUserName(user: AuthUser): string {
-  if (user.role === 'platform') return '张运营'
-  if (user.role === 'expert') return '张教授'
-  if (user.role === 'enterprise-admin') return '李企服'
-  const org = ORG_LABELS[user.orgKind]
-  return org.length >= 2 ? `${org.slice(0, 2)}专员` : '运营专员'
+function workbenchUserName(_user: AuthUser): string {
+  return '张运营'
 }
 
 /** 统一的卡片外壳：左侧科技蓝强调条 + 标题区底部分隔 */

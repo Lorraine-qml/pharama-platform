@@ -10,6 +10,8 @@ export default defineConfig({
     host: true,
     strictPort: false,
     open: false,
+    // 关键：允许所有外部域名访问（解决 serveo 链接被拦截的问题）
+    allowedHosts: true,
   },
   preview: {
     host: true,

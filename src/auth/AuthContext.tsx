@@ -6,11 +6,16 @@ import {
   useMemo,
   useSyncExternalStore,
 } from 'react'
-import type { AuthUser } from './types'
-import { ORG_LABELS, ROLE_LABELS, type OrgKind, type UserRole } from './types'
+import type { AuthUser, OrgKind, UserRole } from './types'
 
 const STORAGE_SESSION = 'pharma-platform-auth'
 const STORAGE_PERSIST = 'pharma-platform-auth-persist'
+
+const DEFAULT_USER: AuthUser = {
+  role: 'platform',
+  orgKind: 'physical',
+  displayName: '平台管理员 · 演示全功能',
+}
 
 export type LoginPayload = { role: UserRole; orgKind: OrgKind }
 
@@ -27,7 +32,7 @@ function parseStored(): AuthUser | null {
   }
 }
 
-let memoryUser: AuthUser | null = parseStored()
+let memoryUser: AuthUser | null = parseStored() ?? DEFAULT_USER
 const listeners = new Set<() => void>()
 
 function subscribe(cb: () => void) {
@@ -55,12 +60,8 @@ function persist(user: AuthUser | null, remember = false) {
   emit()
 }
 
-function buildDisplayName(orgKind: OrgKind, role: UserRole) {
-  let base: string
-  if (role === 'platform') base = `${ORG_LABELS[orgKind]} · 园区运营（全菜单）`
-  else if (role === 'expert') base = `${ORG_LABELS[orgKind]} · ${ROLE_LABELS[role]}（张教授）`
-  else base = `${ORG_LABELS[orgKind]} · ${ROLE_LABELS[role]}`
-  return `${base} · 演示全功能`
+function buildDisplayName(_orgKind: OrgKind, _role: UserRole) {
+  return '平台管理员 · 演示全功能'
 }
 
 type AuthContextValue = {
@@ -84,7 +85,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [])
 
   const logout = useCallback(() => {
-    persist(null)
+    persist(DEFAULT_USER)
   }, [])
 
   const value = useMemo(() => ({ user, login, logout }), [user, login, logout])
